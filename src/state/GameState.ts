@@ -297,7 +297,7 @@ export class GameStateManager {
     switch (itemId) {
       case 'soap_neutralizer':
         // Acid-Base Neutralization
-        sounds.playChemicalReact();
+        sounds.playNeutralizeSuccess();
         this.metrics.toxicityLevel = Math.max(0, this.metrics.toxicityLevel - 45);
         this.solvedDisastersCount += 1;
         this.addLog('🧪 CHEMICAL NEUTRALIZATION DEPLOYED: Basic Alkaline Soap neutralized the cavern acid pool! (pH restored to neutral water).', 'positive');
@@ -389,12 +389,13 @@ export class GameStateManager {
 
     plot.building = null;
     this.addLog(`Demolished ${def.name}. Subterranean pressure adjusted.`, 'info');
-    sounds.playBuild();
+    sounds.playDemolish();
     this.notify();
   }
 
   public endDayCycle() {
     this.day += 1;
+    sounds.playPassDay();
 
     let addedGold = 8;
     let addedWood = 0;

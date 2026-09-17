@@ -18,9 +18,8 @@ export class BootScene extends Phaser.Scene {
   }
 
   create() {
-    // Launch main scenes
-    this.scene.start('SurfaceScene');
-    this.scene.launch('UIScene');
+    // Launch opening demo prologue scene
+    this.scene.start('OpeningDemoScene');
   }
 
   private generateProceduralTextures() {

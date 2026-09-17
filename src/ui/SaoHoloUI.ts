@@ -77,6 +77,10 @@ export class SaoHoloUI {
           <span class="hex-icon">💤</span>
           <span class="hex-label">REST</span>
         </button>
+        <button class="sao-hex-btn" id="sao-btn-audio" title="Toggle Sound (Mute / Unmute)">
+          <span class="hex-icon" id="sao-audio-icon">${sounds.isMuted ? '🔇' : '🔊'}</span>
+          <span class="hex-label" id="sao-audio-label">${sounds.isMuted ? 'MUTED' : 'AUDIO'}</span>
+        </button>
       </nav>
 
       <!-- SAO Holographic Stores Modal -->
@@ -243,6 +247,25 @@ export class SaoHoloUI {
       gameState.endDayCycle();
     });
 
+    // Audio Mute/Unmute Toggle
+    document.getElementById('sao-btn-audio')?.addEventListener('click', () => {
+      const isMuted = sounds.toggleMute();
+      const icon = document.getElementById('sao-audio-icon');
+      const label = document.getElementById('sao-audio-label');
+      if (icon) icon.textContent = isMuted ? '🔇' : '🔊';
+      if (label) label.textContent = isMuted ? 'MUTED' : 'AUDIO';
+      if (!isMuted) {
+        sounds.playHexClick();
+      }
+    });
+
+    // Subtle Hex Hover Sounds on all navigation buttons
+    this.container.querySelectorAll('.sao-hex-btn').forEach(btn => {
+      btn.addEventListener('mouseenter', () => {
+        sounds.playHexHover();
+      });
+    });
+
     // Store Modal Light Dismiss & Close
     document.getElementById('sao-store-close')?.addEventListener('click', () => {
       sounds.playSaoSelect();
@@ -348,7 +371,7 @@ export class SaoHoloUI {
     const img = document.getElementById('sao-snapshot-img') as HTMLImageElement;
     if (img) img.src = imgDataUrl;
     if (modal) modal.style.display = 'flex';
-    sounds.playSaoOpen();
+    sounds.playModalWhoosh();
   }
 
   public closeSnapshotModal() {
@@ -356,6 +379,7 @@ export class SaoHoloUI {
     this.currentSnapshotUrl = '';
     const modal = document.getElementById('sao-snapshot-modal');
     if (modal) modal.style.display = 'none';
+    sounds.playModalWhoosh();
     if (!this.isAnyModalOpen()) {
       const kb = window.phaserGameInstance?.input?.keyboard;
       if (kb) kb.enabled = true;
@@ -468,6 +492,7 @@ export class SaoHoloUI {
     if (kb) kb.enabled = false;
     const modal = document.getElementById('sao-store-modal');
     if (modal) modal.style.display = 'flex';
+    sounds.playModalWhoosh();
     this.renderStoreItems();
   }
 
@@ -475,6 +500,7 @@ export class SaoHoloUI {
     this.isStoreOpen = false;
     const modal = document.getElementById('sao-store-modal');
     if (modal) modal.style.display = 'none';
+    sounds.playModalWhoosh();
     if (!this.isAnyModalOpen()) {
       const kb = window.phaserGameInstance?.input?.keyboard;
       if (kb) kb.enabled = true;
@@ -488,6 +514,7 @@ export class SaoHoloUI {
     if (kb) kb.enabled = false;
     const modal = document.getElementById('sao-showcase-modal');
     if (modal) modal.style.display = 'flex';
+    sounds.playModalWhoosh();
 
     const host = document.getElementById('threejs-canvas-host');
     if (host && !this.showcase3D) {
@@ -517,6 +544,7 @@ export class SaoHoloUI {
     }
     const modal = document.getElementById('sao-showcase-modal');
     if (modal) modal.style.display = 'none';
+    sounds.playModalWhoosh();
 
     if (this.showcase3D) {
       this.showcase3D.resetCamera();

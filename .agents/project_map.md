@@ -15,7 +15,7 @@
   - `src/types.ts`: Game state, consequence metrics, building specifications, and mining node data models.
   - `src/data/buildings.ts`: Building catalog with mechanical trade-offs and unintended consequence parameters.
   - `src/state/GameState.ts`: Central reactive state manager handling economy, consequences, and win/loss conditions.
-  - `src/audio/SoundEffects.ts`: Zero-dependency procedural Web Audio API synthesizer.
+  - `src/audio/SoundEffects.ts`: Zero-dependency rich procedural Web Audio API synthesizer with tailored pitch-reactive mining clinks, SAO holographic UI audio cues, triumphant fanfares, battle clash & spell projectiles, and persistent mute/volume controls.
   - `src/scenes/BootScene.ts`: Procedural canvas pixel-art generator for player, tiles, buildings, hazards, and ore.
   - `src/scenes/SurfaceScene.ts`: Interactive City Builder view with building plots, atmospheric consequences, and mine lift.
   - `src/scenes/CavernScene.ts`: 2D precision miner-platformer with dynamic ceiling sagging, mudslide friction, falling stalactites, and acid/healing fluid pools.
@@ -36,8 +36,10 @@
 - `package.json` / `tsconfig.json`: Vite and TypeScript configuration.
 
 ## 📝 Recent Architectural Decisions
+- **2026-09-17:** Engineered comprehensive procedural Web Audio API engine (`SoundEffects.ts`) featuring zero external asset loading, SAO Link Start frequency sweeps, material-tailored mining strikes (coal, iron, lumens, aether), multi-oscillator brass royal fanfares, FM demonic growls, and interactive SAO navigation dock audio controls (persistent mute/volume toggle and interaction auto-unlock).
 - **2026-09-17:** Resolved 3D mode button clickability bug by adding pointer-event isolation, explicit z-indexing, global Escape key dismiss, and in-app brag card preview modal.
 - **2026-09-17:** Upgraded 3D City Showcase with procedural PBR textures, waving banners, smoking chimneys, and realistic lighting.
 - **2026-09-17:** Integrated Parallel World Conquering (`WarEngine.ts`), Factions (Demon King, Sylvans, Molekin), Army Mobilization, and Playtime Event Scheduler (`PlaytimeEventEngine.ts`).
 - **2026-09-17:** Formulated complete Game Design Document for "Overburden: Tales from the Under-Town" (City Builder + 2D Platformer hybrid exploring Unexpected Consequences through Resource Balancing, Delayed Ripples, and Perverse Incentives).
 - **2026-09-17:** Scaffolded project map, created master game asset documentation from 4 primary web hubs (Kenney, OpenGameArt, itch.io, r/gamedev 50+ list), and initialized structured asset repository directories.
+- **2026-09-17:** Implemented responsive fullscreen architecture (100vw x 100vh) with Phaser.Scale.RESIZE, dynamic expanding building plots (up to 14 plots), and camera fade reset on wake; created OpeningDemoScene with SAO Link Start anime prologue and interactive dioramas; integrated procedural Web Audio sound suite across all gameplay actions.

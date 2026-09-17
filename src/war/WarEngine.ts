@@ -466,7 +466,11 @@ export class WarEngine {
     battalion.units[unitType] = (battalion.units[unitType] || 0) + 1;
     this.recalculateBattalionStats(battalion);
 
-    sounds.playSwordClash();
+    if (unitType === UnitType.ARCANE_SORCERER) {
+      sounds.playSpellCast();
+    } else {
+      sounds.playBattleClash();
+    }
     gameState.addLog(
       `⚔️ Recruited 1x ${unitDef.name} into ${battalion.name}! Power: ${battalion.attackPower} ATK / ${battalion.defensePower} DEF.`,
       'positive'
@@ -539,7 +543,7 @@ export class WarEngine {
     b.destinationTerritoryId = destinationId;
     b.marchProgress = 0;
 
-    sounds.playSaoConfirm();
+    sounds.playWarMarch();
     gameState.addLog(`🚩 ${b.name} started marching toward ${destT.name}!`, 'info');
 
     // Instantly or fast arrival
@@ -632,7 +636,7 @@ export class WarEngine {
         isBoss: false,
         unitsSummary: '4x Shadow Prowlers, 2x Bramble Goliaths'
       };
-      sounds.playSwordClash();
+      sounds.playBattleClash();
       gameState.addLog(`⚔️ Cleansing territory defenders at ${t.name}!`, 'warning');
     }
 
@@ -724,7 +728,7 @@ export class WarEngine {
     const dmgToEnemy = Math.max(15, Math.round(netPlayerAtk * (100 / (100 + netEnemyDef))));
 
     ef.totalHp = Math.max(0, ef.totalHp - dmgToEnemy);
-    sounds.playSwordClash();
+    sounds.playBattleClash();
 
     // Check crit
     const isCrit = Math.random() < 0.2;

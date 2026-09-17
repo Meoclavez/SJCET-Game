@@ -57,7 +57,8 @@ export class WarRoomUI {
 
     const modal = document.getElementById('sao-war-modal');
     if (modal) modal.style.display = 'flex';
-    sounds.playSaoOpen();
+    sounds.playModalWhoosh();
+    sounds.playWarMarch();
     this.updateContent();
   }
 
@@ -69,7 +70,7 @@ export class WarRoomUI {
     this.isOpen = false;
     const modal = document.getElementById('sao-war-modal');
     if (modal) modal.style.display = 'none';
-    sounds.playSaoSelect();
+    sounds.playModalWhoosh();
   }
 
   private render() {
@@ -358,7 +359,7 @@ export class WarRoomUI {
 
       const res = warEngine.initiateSkirmish(readyBat.id, this.selectedTerritoryId);
       if (res.success) {
-        sounds.playWarHorn();
+        sounds.playWarMarch();
         this.switchTab('skirmish');
       } else {
         alert(res.message);
@@ -371,6 +372,7 @@ export class WarRoomUI {
       if (select && select.value) {
         const res = warEngine.marchBattalion(select.value, this.selectedTerritoryId);
         if (res.success) {
+          sounds.playWarMarch();
           this.updateContent();
         } else {
           alert(res.message);
@@ -523,6 +525,7 @@ export class WarRoomUI {
     document.getElementById('btn-muster-battalion')?.addEventListener('click', () => {
       const res = warEngine.musterNewBattalion();
       if (res.success) {
+        sounds.playWarMarch();
         this.updateContent();
       } else {
         alert(res.message);
@@ -536,6 +539,11 @@ export class WarRoomUI {
         if (uType && this.selectedBattalionId) {
           const res = warEngine.recruitUnit(this.selectedBattalionId, uType);
           if (res.success) {
+            if (uType === UnitType.ARCANE_SORCERER) {
+              sounds.playSpellCast();
+            } else {
+              sounds.playBattleClash();
+            }
             this.updateContent();
           } else {
             alert(res.message);
@@ -887,7 +895,11 @@ export class WarRoomUI {
       btn.addEventListener('click', (e) => {
         const stance = (e.currentTarget as HTMLElement).getAttribute('data-stance') as any;
         if (stance && warEngine.activeBattle) {
-          sounds.playSaoSelect();
+          if (stance === 'ARCANE_BARRAGE') {
+            sounds.playSpellCast();
+          } else {
+            sounds.playBattleClash();
+          }
           warEngine.activeBattle.playerStance = stance;
           this.updateContent();
         }
@@ -896,6 +908,11 @@ export class WarRoomUI {
 
     // Strike next round
     document.getElementById('btn-next-round')?.addEventListener('click', () => {
+      if (warEngine.activeBattle?.playerStance === 'ARCANE_BARRAGE') {
+        sounds.playSpellCast();
+      } else {
+        sounds.playBattleClash();
+      }
       warEngine.stepBattleRound();
       this.updateContent();
     });

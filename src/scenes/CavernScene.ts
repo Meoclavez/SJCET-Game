@@ -31,6 +31,8 @@ export class CavernScene extends Phaser.Scene {
   private isAcid: boolean = false;
 
   private elevator!: Phaser.Physics.Arcade.Sprite;
+  private elevatorCable!: Phaser.GameObjects.Line;
+  private elevatorPrompt!: Phaser.GameObjects.Text;
   private pickaxeSprite!: Phaser.GameObjects.Image;
   private isMining: boolean = false;
   private lastMineTime: number = 0;
@@ -44,12 +46,19 @@ export class CavernScene extends Phaser.Scene {
   // Jump feel improvements
   private coyoteTimer: number = 0;
   private jumpBufferTimer: number = 0;
-  private isWallSliding: boolean = false;
 
+  private backdropGraphics!: Phaser.GameObjects.Graphics;
   private unsubscribe!: () => void;
 
   constructor() {
     super({ key: 'CavernScene' });
+  }
+
+  private getWorldDimensions(): { width: number; height: number } {
+    return {
+      width: Math.max(this.scale.width, 1440),
+      height: Math.max(this.scale.height, 900),
+    };
   }
 
   create() {
@@ -57,75 +66,91 @@ export class CavernScene extends Phaser.Scene {
     this.playerHp = 100;
     this.haulCount = 0;
 
-    // 1. Setup World Boundaries
-    this.physics.world.setBounds(0, 0, 1024, 640);
+    const { width: worldWidth, height: worldHeight } = this.getWorldDimensions();
+
+    // 1. Setup World Boundaries & Gravity
+    this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
     this.physics.world.gravity.y = 900;
 
-    // 2. Draw Cavern Rocky Backing
-    this.drawCavernBackdrop();
+    // 2. Camera bounds and fade in safety
+    this.cameras.main.resetFX();
+    this.cameras.main.setAlpha(1);
+    this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
+    this.cameras.main.fadeIn(300, 0, 0, 0);
 
-    // 3. Dynamic Platforms (affected by Root Integrity)
+    // 3. Draw Cavern Rocky Backing
+    this.backdropGraphics = this.add.graphics();
+    this.drawCavernBackdrop(worldWidth, worldHeight);
+
+    // 4. Dynamic Platforms (affected by Root Integrity)
     this.platforms = this.physics.add.staticGroup();
-    this.buildDynamicCavernLevel();
+    this.buildDynamicCavernLevel(worldWidth, worldHeight);
 
-    // 4. Dynamic Ceiling & Stalactites (affected by Tectonic Weight)
+    // 5. Dynamic Ceiling & Stalactites (affected by Tectonic Weight)
     this.ceilingGroup = this.add.group();
-    this.buildDynamicCeiling();
+    this.buildDynamicCeiling(worldWidth);
 
-    // 5. Bottom Pit Fluid (affected by Toxicity Level)
-    this.buildDynamicFluidPool();
+    // 6. Bottom Pit Fluid (affected by Toxicity Level)
+    this.buildDynamicFluidPool(worldWidth, worldHeight);
 
-    // 6. Mining Elevator (Return to surface)
-    this.createElevator();
+    // 7. Mining Elevator (Return to surface)
+    this.createElevator(worldWidth);
 
-    // 7. Spawn Player
-    this.createPlayer();
+    // 8. Spawn Player
+    this.createPlayer(worldWidth);
 
-    // 8. Spawn Mining Nodes (Coal, Iron, Quartz, Aether Core)
-    this.spawnMiningNodes();
+    // Camera follow player smoothly
+    this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
 
-    // 9. Controls
+    // 9. Spawn Mining Nodes (Coal, Iron, Quartz, Aether Core)
+    this.spawnMiningNodes(worldWidth, worldHeight);
+
+    // 10. Controls
     this.setupInput();
 
-    // 10. Subscribe to GameState
+    // 11. Handle Window Resize
+    this.scale.on('resize', this.handleResize, this);
+
+    // 12. Subscribe to GameState
     this.unsubscribe = gameState.subscribe(() => {
       this.syncConsequences();
     });
 
     // Scene lifecycle listeners
     this.events.on(Phaser.Scenes.Events.WAKE, () => {
-      this.cameras.main.fadeIn(400, 0, 0, 0);
+      this.cameras.main.resetFX();
+      this.cameras.main.setAlpha(1);
+      this.cameras.main.fadeIn(300, 0, 0, 0);
       this.resetCavernRun();
     });
 
     this.events.on(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.scale.off('resize', this.handleResize, this);
       if (this.unsubscribe) this.unsubscribe();
     });
-
-    // Camera fade in
-    this.cameras.main.fadeIn(400, 0, 0, 0);
 
     // Initial consequence announcement
     this.announceActiveMutations();
   }
 
-  private drawCavernBackdrop() {
-    const bg = this.add.graphics();
-    bg.fillGradientStyle(0x0f172a, 0x0f172a, 0x020617, 0x020617, 1);
-    bg.fillRect(0, 0, 1024, 640);
+  private drawCavernBackdrop(worldWidth: number, worldHeight: number) {
+    this.backdropGraphics.clear();
+    this.backdropGraphics.fillGradientStyle(0x0f172a, 0x0f172a, 0x020617, 0x020617, 1);
+    this.backdropGraphics.fillRect(0, 0, worldWidth, worldHeight);
 
-    // Deep rock crags pattern
-    bg.fillStyle(0x1e293b, 0.4);
-    for (let i = 0; i < 30; i++) {
-      const rx = Phaser.Math.Between(40, 980);
-      const ry = Phaser.Math.Between(60, 560);
-      const rw = Phaser.Math.Between(60, 180);
+    // Deep rock crags pattern across expansive world
+    this.backdropGraphics.fillStyle(0x1e293b, 0.45);
+    const cragCount = Math.floor((worldWidth * worldHeight) / 22000);
+    for (let i = 0; i < cragCount; i++) {
+      const rx = Phaser.Math.Between(40, worldWidth - 120);
+      const ry = Phaser.Math.Between(60, worldHeight - 80);
+      const rw = Phaser.Math.Between(60, 220);
       const rh = Phaser.Math.Between(30, 90);
-      bg.fillRoundedRect(rx, ry, rw, rh, 8);
+      this.backdropGraphics.fillRoundedRect(rx, ry, rw, rh, 8);
     }
   }
 
-  private buildDynamicCavernLevel() {
+  private buildDynamicCavernLevel(worldWidth: number, worldHeight: number) {
     this.platforms.clear(true, true);
     this.crumblingPlatforms.forEach(p => p.destroy());
     this.crumblingPlatforms.length = 0;
@@ -139,7 +164,6 @@ export class CavernScene extends Phaser.Scene {
       for (let i = 0; i < widthInTiles; i++) {
         const px = x + i * 32;
         if (isCrumble && isMud) {
-          // Crumbly loose platform
           const p = this.physics.add.sprite(px + 16, y + 16, tileKey);
           p.setImmovable(true);
           (p.body as Phaser.Physics.Arcade.Body).setAllowGravity(false);
@@ -151,50 +175,59 @@ export class CavernScene extends Phaser.Scene {
       }
     };
 
-    // --- LEVEL PLATFORM LAYOUT ---
+    const floorY = worldHeight - 50;
+
+    // --- RESPONSIVE LEVEL PLATFORM LAYOUT ---
     // Top Elevator entry ledge
-    makeLedge(860, 130, 5);
+    makeLedge(worldWidth - 220, 130, 7);
 
     // Tier 1 High Ledges
-    makeLedge(580, 180, 7);
-    makeLedge(160, 210, 8);
+    makeLedge(Math.round(worldWidth * 0.55), 180, 8);
+    makeLedge(Math.round(worldWidth * 0.14), 210, 8);
 
     // Tier 2 Mid Ledges
-    makeLedge(380, 310, 6, true);
-    makeLedge(40, 350, 6);
-    makeLedge(720, 370, 7, true);
+    makeLedge(Math.round(worldWidth * 0.35), 320, 7, true);
+    makeLedge(40, 360, 6);
+    makeLedge(Math.round(worldWidth * 0.72), 370, 8, true);
 
     // Tier 3 Deep Cavern Ledges
-    makeLedge(220, 460, 8);
-    makeLedge(520, 480, 7);
+    makeLedge(Math.round(worldWidth * 0.22), 480, 8);
+    makeLedge(Math.round(worldWidth * 0.52), 500, 8);
 
     // Bottom solid ground flanking the acid/healing pool
-    makeLedge(0, 580, 7);
-    makeLedge(780, 580, 8);
+    const leftTiles = Math.ceil((worldWidth * 0.22) / 32);
+    const rightStart = Math.round(worldWidth * 0.78);
+    const rightTiles = Math.ceil((worldWidth - rightStart) / 32);
+
+    makeLedge(0, floorY, leftTiles);
+    makeLedge(rightStart, floorY, rightTiles);
   }
 
-  private buildDynamicCeiling() {
+  private buildDynamicCeiling(worldWidth: number) {
     this.ceilingGroup.clear(true, true);
     this.stalactites.forEach(s => s.sprite.destroy());
     this.stalactites = [];
 
     const weight = gameState.metrics.tectonicWeight;
-    // Sagging ceiling height: 0 weight = y: 20, 100 weight = y: 75!
+    // Sagging ceiling height: 0 weight = y: 20, 100 weight = y: 75
     const sagY = 20 + (weight / 100) * 55;
 
-    // Draw crushing ceiling blocks
-    for (let x = 0; x < 1024; x += 32) {
+    // Draw crushing ceiling blocks spanning worldWidth
+    for (let x = 0; x < worldWidth; x += 32) {
       const tile = this.add.image(x + 16, sagY - 10, weight > 50 ? 'tile_cracked_ceiling' : 'tile_stone');
       this.ceilingGroup.add(tile);
     }
 
     // Spawn falling stalactites if weight is above 25%
     if (weight > 25) {
-      const spikeCount = Math.floor(weight / 15);
-      const positions = [260, 440, 620, 790, 330, 510];
+      const spikeCount = Math.floor(weight / 12);
+      const positions: number[] = [];
+      const step = worldWidth / (spikeCount + 2);
+      for (let i = 1; i <= spikeCount; i++) {
+        positions.push(Math.round(i * step));
+      }
 
-      for (let i = 0; i < Math.min(spikeCount, positions.length); i++) {
-        const sx = positions[i];
+      for (const sx of positions) {
         const spike = this.physics.add.sprite(sx, sagY + 8, 'stalactite');
         spike.setImmovable(true);
         (spike.body as Phaser.Physics.Arcade.Body).setAllowGravity(false);
@@ -202,126 +235,143 @@ export class CavernScene extends Phaser.Scene {
         this.stalactites.push({
           sprite: spike,
           triggerX: sx,
-          hasFallen: false
+          hasFallen: false,
         });
       }
     }
   }
 
-  private buildDynamicFluidPool() {
+  private buildDynamicFluidPool(worldWidth: number, worldHeight: number) {
     if (this.fluidHazard) this.fluidHazard.destroy();
     if (this.fluidTopLine) this.fluidTopLine.destroy();
 
     const tox = gameState.metrics.toxicityLevel;
     this.isAcid = tox >= 45;
 
-    // Fluid pool occupies bottom center (x: 224 to 780, y: 560 to 640)
+    const poolLeft = Math.round(worldWidth * 0.22);
+    const poolRight = Math.round(worldWidth * 0.78);
+    const poolWidth = poolRight - poolLeft;
+    const poolCenterX = (poolLeft + poolRight) / 2;
+    const floorY = worldHeight - 50;
+
     const fluidColor = this.isAcid ? 0x16a34a : 0x0284c7;
     const fluidAlpha = this.isAcid ? 0.85 : 0.75;
 
-    this.fluidHazard = this.add.rectangle(502, 600, 556, 80, fluidColor, fluidAlpha);
+    this.fluidHazard = this.add.rectangle(poolCenterX, floorY + 40, poolWidth, 90, fluidColor, fluidAlpha);
     this.physics.add.existing(this.fluidHazard, true);
 
     this.fluidTopLine = this.add.graphics();
     this.fluidTopLine.lineStyle(3, this.isAcid ? 0x4ade80 : 0x38bdf8, 1);
     this.fluidTopLine.beginPath();
-    this.fluidTopLine.moveTo(224, 560);
-    this.fluidTopLine.lineTo(780, 560);
+    this.fluidTopLine.moveTo(poolLeft, floorY);
+    this.fluidTopLine.lineTo(poolRight, floorY);
     this.fluidTopLine.stroke();
 
     // Floating particles (bubbles)
     const bubbleColor = this.isAcid ? 'particle_acid' : 'particle_heal';
-    for (let i = 0; i < 8; i++) {
-      const bx = Phaser.Math.Between(240, 760);
-      const bubble = this.add.image(bx, 590, bubbleColor).setScale(0.8);
+    for (let i = 0; i < 10; i++) {
+      const bx = Phaser.Math.Between(poolLeft + 20, poolRight - 20);
+      const bubble = this.add.image(bx, floorY + 30, bubbleColor).setScale(0.8);
       this.tweens.add({
         targets: bubble,
-        y: 560,
+        y: floorY,
         alpha: 0,
         duration: Phaser.Math.Between(1500, 2500),
         repeat: -1,
-        delay: Phaser.Math.Between(0, 2000)
+        delay: Phaser.Math.Between(0, 2000),
       });
     }
   }
 
-  private createElevator() {
-    this.elevator = this.physics.add.sprite(930, 95, 'elevator');
+  private createElevator(worldWidth: number) {
+    const elevX = worldWidth - 110;
+    const elevY = 95;
+
+    if (this.elevator) this.elevator.destroy();
+    if (this.elevatorCable) this.elevatorCable.destroy();
+    if (this.elevatorPrompt) this.elevatorPrompt.destroy();
+
+    this.elevator = this.physics.add.sprite(elevX, elevY, 'elevator');
     this.elevator.setImmovable(true);
     (this.elevator.body as Phaser.Physics.Arcade.Body).setAllowGravity(false);
 
     // Cable to ceiling
-    const cable = this.add.line(0, 0, 930, 0, 930, 95, 0xf59e0b, 0.8).setLineWidth(2);
-    cable.setOrigin(0, 0);
+    this.elevatorCable = this.add.line(0, 0, elevX, 0, elevX, elevY, 0xf59e0b, 0.8).setLineWidth(2);
+    this.elevatorCable.setOrigin(0, 0);
 
-    const prompt = this.add.text(930, 45, 'SURFACE LIFT\n[W / TAB]', {
+    this.elevatorPrompt = this.add.text(elevX, 45, 'SURFACE LIFT\n[W / TAB]', {
       fontFamily: '"Press Start 2P", monospace',
       fontSize: '7px',
       color: '#f59e0b',
       align: 'center',
       backgroundColor: '#000000aa',
-      padding: { x: 4, y: 2 }
+      padding: { x: 4, y: 2 },
     }).setOrigin(0.5);
 
     this.tweens.add({
-      targets: prompt,
+      targets: this.elevatorPrompt,
       y: 40,
       yoyo: true,
       repeat: -1,
-      duration: 1000
+      duration: 1000,
     });
   }
 
-  private createPlayer() {
-    // Spawn near elevator
-    this.player = this.physics.add.sprite(910, 80, 'player');
-    this.player.setCollideWorldBounds(true);
-    this.player.setBounce(0.05);
+  private createPlayer(worldWidth: number) {
+    const spawnX = worldWidth - 130;
+    const spawnY = 80;
+
+    if (!this.player) {
+      this.player = this.physics.add.sprite(spawnX, spawnY, 'player');
+      this.player.setCollideWorldBounds(true);
+      this.player.setBounce(0.05);
+
+      this.pickaxeSprite = this.add.image(this.player.x + 12, this.player.y, 'pickaxe')
+        .setOrigin(0.2, 0.8)
+        .setScale(0.85);
+
+      // Collisions with static platforms
+      this.physics.add.collider(this.player, this.platforms, () => {
+        this.coyoteTimer = 100;
+      });
+
+      // Collisions with crumbling platforms
+      this.physics.add.collider(this.player, this.crumblingPlatforms, (_p, platform) => {
+        this.coyoteTimer = 100;
+        this.handleCrumbleTouch(platform as Phaser.Physics.Arcade.Sprite);
+      });
+    } else {
+      this.player.setPosition(spawnX, spawnY);
+      this.player.setVelocity(0, 0);
+    }
 
     // Adjust friction based on root integrity
     const roots = gameState.metrics.rootIntegrity;
     if (roots < 40) {
-      // Slippery mud physics!
       this.player.setDragX(250);
     } else {
       this.player.setDragX(1200);
     }
-
-    // Pickaxe attached to player
-    this.pickaxeSprite = this.add.image(this.player.x + 12, this.player.y, 'pickaxe')
-      .setOrigin(0.2, 0.8)
-      .setScale(0.85);
-
-    // Collisions with static platforms
-    this.physics.add.collider(this.player, this.platforms, () => {
-      this.coyoteTimer = 100; // Reset coyote time on ground
-    });
-
-    // Collisions with crumbling platforms
-    this.physics.add.collider(this.player, this.crumblingPlatforms, (_p, platform) => {
-      this.coyoteTimer = 100;
-      this.handleCrumbleTouch(platform as Phaser.Physics.Arcade.Sprite);
-    });
   }
 
-  private spawnMiningNodes() {
+  private spawnMiningNodes(worldWidth: number, worldHeight: number) {
     this.nodeSprites.forEach(c => c.destroy());
     this.nodeSprites.clear();
     this.miningNodes = [];
 
-    // Define Node Spawns
+    // Define Node Spawns mapped across vast dimensions
     const nodeDefs: Omit<MiningNode, 'hp'>[] = [
       // Stone & Coal Nodes
-      { x: 180, y: 178, type: 'coal', maxHp: 3, yieldAmount: 20, resourceKey: 'gold' },
-      { x: 640, y: 148, type: 'stone', maxHp: 3, yieldAmount: 35, resourceKey: 'stone' },
+      { x: Math.round(worldWidth * 0.16), y: 178, type: 'coal', maxHp: 3, yieldAmount: 20, resourceKey: 'gold' },
+      { x: Math.round(worldWidth * 0.60), y: 148, type: 'stone', maxHp: 3, yieldAmount: 35, resourceKey: 'stone' },
       // Iron Ore Veins
-      { x: 80, y: 318, type: 'iron', maxHp: 4, yieldAmount: 18, resourceKey: 'iron' },
-      { x: 760, y: 338, type: 'iron', maxHp: 4, yieldAmount: 22, resourceKey: 'iron' },
+      { x: 80, y: 328, type: 'iron', maxHp: 4, yieldAmount: 18, resourceKey: 'iron' },
+      { x: Math.round(worldWidth * 0.76), y: 338, type: 'iron', maxHp: 4, yieldAmount: 22, resourceKey: 'iron' },
       // Luminescent Crystals
-      { x: 440, y: 278, type: 'lumens', maxHp: 3, yieldAmount: 12, resourceKey: 'lumens' },
-      { x: 260, y: 428, type: 'lumens', maxHp: 3, yieldAmount: 15, resourceKey: 'lumens' },
+      { x: Math.round(worldWidth * 0.40), y: 288, type: 'lumens', maxHp: 3, yieldAmount: 12, resourceKey: 'lumens' },
+      { x: Math.round(worldWidth * 0.26), y: 448, type: 'lumens', maxHp: 3, yieldAmount: 15, resourceKey: 'lumens' },
       // The Legendary Aether Core (Deepest Center Alcove)
-      { x: 550, y: 448, type: 'aether', maxHp: 6, yieldAmount: 1, resourceKey: 'aetherCore' }
+      { x: Math.round(worldWidth * 0.54), y: 468, type: 'aether', maxHp: 6, yieldAmount: 1, resourceKey: 'aetherCore' },
     ];
 
     nodeDefs.forEach(def => {
@@ -346,7 +396,7 @@ export class CavernScene extends Phaser.Scene {
           scale: 1.15,
           yoyo: true,
           repeat: -1,
-          duration: 800
+          duration: 800,
         });
       }
     });
@@ -420,7 +470,6 @@ export class CavernScene extends Phaser.Scene {
     }
 
     if (this.jumpBufferTimer > 0 && this.coyoteTimer > 0) {
-      // Execute Jump
       body.setVelocityY(-450);
       this.jumpBufferTimer = 0;
       this.coyoteTimer = 0;
@@ -476,7 +525,7 @@ export class CavernScene extends Phaser.Scene {
       onComplete: () => {
         this.isMining = false;
         this.pickaxeSprite.setAngle(0);
-      }
+      },
     });
 
     // Check hit against nearby mining nodes
@@ -492,7 +541,6 @@ export class CavernScene extends Phaser.Scene {
 
   private damageMiningNode(node: MiningNode) {
     node.hp -= 1;
-    sounds.playPickaxeClink(node.type);
     this.cameras.main.shake(80, 0.005);
     this.spawnSparks(node.x, node.y);
 
@@ -507,7 +555,6 @@ export class CavernScene extends Phaser.Scene {
     }
 
     if (node.hp <= 0) {
-      // Ore Vein Shattered!
       sounds.playOreBreak();
       this.spawnRockDebris(node.x, node.y);
       gameState.depositMinedOre(node.resourceKey, node.yieldAmount);
@@ -517,7 +564,7 @@ export class CavernScene extends Phaser.Scene {
       const lootText = this.add.text(node.x, node.y - 20, `+${node.yieldAmount} ${node.type.toUpperCase()}`, {
         fontFamily: '"Press Start 2P", monospace',
         fontSize: '9px',
-        color: node.type === 'aether' ? '#c084fc' : '#38bdf8'
+        color: node.type === 'aether' ? '#c084fc' : '#38bdf8',
       }).setOrigin(0.5);
 
       this.tweens.add({
@@ -525,7 +572,7 @@ export class CavernScene extends Phaser.Scene {
         y: node.y - 50,
         alpha: 0,
         duration: 900,
-        onComplete: () => lootText.destroy()
+        onComplete: () => lootText.destroy(),
       });
 
       if (container) container.destroy();
@@ -541,7 +588,6 @@ export class CavernScene extends Phaser.Scene {
     hazard.hasFallen = true;
     sounds.playTremor();
 
-    // Shake before dropping
     this.tweens.add({
       targets: hazard.sprite,
       x: '+=3',
@@ -552,12 +598,11 @@ export class CavernScene extends Phaser.Scene {
         (hazard.sprite.body as Phaser.Physics.Arcade.Body).setAllowGravity(true);
         (hazard.sprite.body as Phaser.Physics.Arcade.Body).setVelocityY(320);
 
-        // Check player hit
         const col = this.physics.add.overlap(this.player, hazard.sprite, () => {
           col.destroy();
           this.damagePlayer(25, 'Crushed by falling stalactite!');
         });
-      }
+      },
     });
   }
 
@@ -565,7 +610,6 @@ export class CavernScene extends Phaser.Scene {
     if ((platform as unknown as { isCrumbling?: boolean }).isCrumbling) return;
     (platform as unknown as { isCrumbling?: boolean }).isCrumbling = true;
 
-    // Shake and crumble
     this.tweens.add({
       targets: platform,
       x: '+=2',
@@ -576,19 +620,17 @@ export class CavernScene extends Phaser.Scene {
         (platform.body as Phaser.Physics.Arcade.Body).setAllowGravity(true);
         (platform.body as Phaser.Physics.Arcade.Body).setVelocityY(150);
         this.time.delayedCall(1200, () => platform.destroy());
-      }
+      },
     });
   }
 
   private handleFluidContact(delta: number) {
     if (this.isAcid) {
-      // Continuous Acid Sizzle Damage
       if (!this.isInvulnerable) {
         sounds.playAcidDamage();
         this.damagePlayer(15, 'Boiled in industrial chemical acid!');
       }
     } else {
-      // Healing Mineral Bath
       if (this.playerHp < this.maxHp) {
         this.playerHp = Math.min(this.maxHp, this.playerHp + (delta / 1000) * 12);
       }
@@ -602,18 +644,15 @@ export class CavernScene extends Phaser.Scene {
     this.isInvulnerable = true;
     this.cameras.main.shake(150, 0.015);
 
-    // Knockback
     this.player.setVelocityY(-250);
     this.player.setTint(0xef4444);
 
     if (this.playerHp <= 0) {
-      // Subterranean evacuation
       gameState.addLog(`EXPEDITION FAILED: ${reason} Evacuated to surface.`, 'crisis');
       this.returnToSurface();
       return;
     }
 
-    // Flash invulnerability
     this.tweens.add({
       targets: this.player,
       alpha: 0.3,
@@ -624,7 +663,7 @@ export class CavernScene extends Phaser.Scene {
         this.player.clearTint();
         this.player.setAlpha(1);
         this.isInvulnerable = false;
-      }
+      },
     });
   }
 
@@ -639,7 +678,6 @@ export class CavernScene extends Phaser.Scene {
           this.scene.launch('SurfaceScene');
         }
         gameState.currentMode = GameMode.SURFACE;
-        // End the cycle upon returning with your haul!
         gameState.endDayCycle();
       }
     });
@@ -662,41 +700,56 @@ export class CavernScene extends Phaser.Scene {
   }
 
   private syncConsequences() {
-    // Rebuild ceiling and fluids if state mutated
-    this.buildDynamicCeiling();
-    this.buildDynamicFluidPool();
+    const { width: worldWidth, height: worldHeight } = this.getWorldDimensions();
+    this.buildDynamicCeiling(worldWidth);
+    this.buildDynamicFluidPool(worldWidth, worldHeight);
+  }
+
+  public handleResize() {
+    const { width: worldWidth, height: worldHeight } = this.getWorldDimensions();
+
+    this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
+    this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
+
+    this.drawCavernBackdrop(worldWidth, worldHeight);
+    this.buildDynamicCavernLevel(worldWidth, worldHeight);
+    this.buildDynamicCeiling(worldWidth);
+    this.buildDynamicFluidPool(worldWidth, worldHeight);
+    this.createElevator(worldWidth);
+
+    // Keep mining nodes properly positioned
+    this.nodeSprites.forEach(c => c.destroy());
+    this.nodeSprites.clear();
+    this.spawnMiningNodes(worldWidth, worldHeight);
   }
 
   public resetCavernRun() {
-    // Reset player HP and run stats
     this.playerHp = 100;
     this.haulCount = 0;
     this.isInvulnerable = false;
 
-    // Reposition player at elevator spawn (initial spawn coords)
+    const { width: worldWidth, height: worldHeight } = this.getWorldDimensions();
+
     if (this.player) {
-      this.player.setPosition(910, 80);
+      this.player.setPosition(worldWidth - 130, 80);
       this.player.setVelocity(0, 0);
       this.player.clearTint();
       this.player.setAlpha(1);
     }
     if (this.pickaxeSprite) {
-      this.pickaxeSprite.setPosition(922, 80);
+      this.pickaxeSprite.setPosition(worldWidth - 118, 80);
       this.pickaxeSprite.setAngle(0);
       this.pickaxeSprite.setFlipX(false);
     }
 
-    // Clear and rebuild dynamic platforms, ceiling, and fluid pool according to current gameState metrics
-    this.buildDynamicCavernLevel();
-    this.buildDynamicCeiling();
-    this.buildDynamicFluidPool();
+    this.buildDynamicCavernLevel(worldWidth, worldHeight);
+    this.buildDynamicCeiling(worldWidth);
+    this.buildDynamicFluidPool(worldWidth, worldHeight);
 
-    // Re-spawn mining nodes: clear old nodeSprites, call spawnMiningNodes
     this.nodeSprites.forEach(c => c.destroy());
     this.nodeSprites.clear();
-    this.spawnMiningNodes();
+    this.spawnMiningNodes(worldWidth, worldHeight);
 
-    // Announce active mutations
     this.announceActiveMutations();
   }
 
@@ -708,7 +761,7 @@ export class CavernScene extends Phaser.Scene {
         y: y + Phaser.Math.Between(-4, 4),
         alpha: 0,
         duration: 300,
-        onComplete: () => p.destroy()
+        onComplete: () => p.destroy(),
       });
     }
   }
@@ -722,7 +775,7 @@ export class CavernScene extends Phaser.Scene {
         y: y + Phaser.Math.Between(-24, 24),
         alpha: 0,
         duration: 250,
-        onComplete: () => p.destroy()
+        onComplete: () => p.destroy(),
       });
     }
   }
@@ -736,12 +789,13 @@ export class CavernScene extends Phaser.Scene {
         y: y + Phaser.Math.Between(-35, 20),
         alpha: 0,
         duration: 400,
-        onComplete: () => p.destroy()
+        onComplete: () => p.destroy(),
       });
     }
   }
 
   destroy() {
+    this.scale.off('resize', this.handleResize, this);
     if (this.unsubscribe) this.unsubscribe();
   }
 }

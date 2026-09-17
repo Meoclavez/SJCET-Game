@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>OVERBURDEN: Tales from the Under-Town</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/src/styles/sao-ui.css">
   <style>
     * {
@@ -14,27 +14,31 @@
       margin: 0;
       padding: 0;
       user-select: none;
+      -webkit-user-select: none;
     }
-    body {
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      margin: 0;
+      padding: 0;
+      position: fixed;
+      inset: 0;
       background: #0d1117;
       color: #e6edf3;
       font-family: 'Rajdhani', sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      overflow: hidden;
     }
     #game-container {
-      position: relative;
-      width: 1024px;
-      height: 640px;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8), 0 0 20px rgba(255, 170, 0, 0.2);
-      border: 3px solid #30363d;
-      border-radius: 8px;
+      position: fixed;
+      top: 32px;
+      left: 0;
+      width: 100vw;
+      height: calc(100vh - 32px);
       overflow: hidden;
-      background: #161b22;
+      margin: 0;
+      padding: 0;
+      background: #0d1117;
+      z-index: 1;
     }
     canvas {
       display: block;
@@ -43,62 +47,104 @@
       image-rendering: pixelated;
       image-rendering: crisp-edges;
     }
+    /* Fixed Top Glassmorphic App Bar */
     .header-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 32px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      width: 1024px;
-      padding: 8px 12px;
+      gap: 16px;
+      width: 100vw;
+      padding: 0 16px;
       font-family: 'Press Start 2P', monospace;
-      font-size: 11px;
+      font-size: 8px;
       color: #8b949e;
-      background: #161b22;
-      border-radius: 8px 8px 0 0;
-      border: 3px solid #30363d;
-      border-bottom: none;
+      background: rgba(10, 16, 28, 0.94);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(0, 245, 255, 0.3);
+      box-shadow: 0 2px 16px rgba(0, 0, 0, 0.7);
+      z-index: 1500;
+      pointer-events: auto;
+      contain: layout style;
+      will-change: transform;
+    }
+    .header-bar:hover {
+      border-bottom-color: #00f5ff;
+      box-shadow: 0 2px 20px rgba(0, 245, 255, 0.25);
     }
     .game-title {
       color: #f0883e;
-      letter-spacing: 1px;
+      letter-spacing: 0.5px;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .game-subtitle {
+      font-size: 7.5px;
+      color: #8b949e;
     }
     .game-theme {
       color: #7ee787;
-      font-size: 10px;
+      font-size: 7.5px;
+      white-space: nowrap;
     }
     .controls-hint {
       display: flex;
-      gap: 16px;
-      font-size: 9px;
+      align-items: center;
+      gap: 10px;
+      font-size: 7.5px;
       color: #8b949e;
+      white-space: nowrap;
     }
     .kbd-badge {
       background: #21262d;
       border: 1px solid #484f58;
-      border-radius: 4px;
-      padding: 2px 6px;
+      border-radius: 3px;
+      padding: 1px 5px;
       color: #58a6ff;
+      font-size: 7px;
+    }
+    @media (max-width: 1024px) {
+      .game-subtitle { display: none; }
+      .game-theme { display: none; }
+      .header-bar { font-size: 7px; padding: 4px 10px; gap: 10px; }
+    }
+    @media (max-width: 640px) {
+      .controls-hint { display: none; }
     }
   </style>
 </head>
 <body>
-  <div class="header-bar">
+  <header class="header-bar">
     <div class="game-title">
       <span>⛏️ OVERBURDEN</span>
-      <span style="font-size: 9px; color: #8b949e;">:: Tales from the Under-Town</span>
+      <span class="game-subtitle">:: Tales from the Under-Town</span>
     </div>
     <div class="controls-hint">
-      <span><span class="kbd-badge">TAB</span> Switch View</span>
+      <span><span class="kbd-badge">TAB</span> Switch</span>
       <span><span class="kbd-badge">A</span><span class="kbd-badge">D</span> Move</span>
       <span><span class="kbd-badge">SPACE</span> Jump</span>
-      <span><span class="kbd-badge">J</span> / <span class="kbd-badge">CLICK</span> Mine</span>
+      <span><span class="kbd-badge">J</span> Mine</span>
     </div>
-    <div class="game-theme">THEME: UNEXPECTED CONSEQUENCES</div>
-  </div>
+    <div class="game-theme">CONSEQUENCES</div>
+  </header>
+
   <div id="game-container"></div>
 
+  <script>
+    window.addEventListener('error', (e) => {
+      console.error('Window Error:', e.error || e.message);
+    });
+    window.addEventListener('unhandledrejection', (e) => {
+      console.error('Unhandled Rejection:', e.reason);
+    });
+  </script>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

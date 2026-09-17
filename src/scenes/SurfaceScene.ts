@@ -11,6 +11,8 @@ export class SurfaceScene extends Phaser.Scene {
   private treesGroup!: Phaser.GameObjects.Group;
   private skyGraphics!: Phaser.GameObjects.Graphics;
   private groundGraphics!: Phaser.GameObjects.Graphics;
+  private cloudsGroup!: Phaser.GameObjects.Group;
+  private mineShaftContainer!: Phaser.GameObjects.Container;
   private unsubscribe!: () => void;
   private lastKnownDay: number = 1;
 
@@ -22,6 +24,14 @@ export class SurfaceScene extends Phaser.Scene {
     gameState.currentMode = GameMode.SURFACE;
     this.lastKnownDay = gameState.day;
 
+    const { width, height } = this.scale;
+
+    // Reset camera effects and ensure visibility
+    this.cameras.main.resetFX();
+    this.cameras.main.setAlpha(1);
+    this.cameras.main.centerOn(width / 2, height / 2);
+    this.cameras.main.fadeIn(300, 0, 0, 0);
+
     // 1. Draw Sky & Mountain Background
     this.skyGraphics = this.add.graphics();
     this.drawSky();
@@ -31,6 +41,7 @@ export class SurfaceScene extends Phaser.Scene {
     this.drawGround();
 
     // 3. Decorative Clouds
+    this.cloudsGroup = this.add.group();
     this.createClouds();
 
     // 4. Surface Trees (responsive to root integrity)
@@ -46,20 +57,26 @@ export class SurfaceScene extends Phaser.Scene {
     // 7. Modal Build Menu (hidden by default)
     this.createBuildMenu();
 
-    // 8. Subscribe to GameState changes
+    // 8. Handle Window Resize
+    this.scale.on('resize', this.handleResize, this);
+
+    // 9. Subscribe to GameState changes
     this.unsubscribe = gameState.subscribe(() => {
       this.refreshSurfaceVisuals();
     });
 
     // Scene lifecycle listeners
     this.events.on(Phaser.Scenes.Events.WAKE, () => {
-      const { width, height } = this.scale;
-      this.cameras.main.centerOn(width / 2, height / 2);
-      this.cameras.main.fadeIn(400, 0, 0, 0);
+      const { width: currentW, height: currentH } = this.scale;
+      this.cameras.main.resetFX();
+      this.cameras.main.setAlpha(1);
+      this.cameras.main.centerOn(currentW / 2, currentH / 2);
+      this.cameras.main.fadeIn(300, 0, 0, 0);
       this.refreshSurfaceVisuals();
     });
 
     this.events.on(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.scale.off('resize', this.handleResize, this);
       if (this.unsubscribe) this.unsubscribe();
     });
 
@@ -70,33 +87,43 @@ export class SurfaceScene extends Phaser.Scene {
     });
   }
 
+  private getGroundY(): number {
+    const { height } = this.scale;
+    return Math.min(height - 200, Math.max(380, Math.round(height * 0.64)));
+  }
+
   private drawSky() {
     this.skyGraphics.clear();
-    const { width, height } = this.scale;
+    const { width } = this.scale;
+    const groundY = this.getGroundY();
     const tox = gameState.metrics.toxicityLevel;
 
-    // If toxicity is high, sky becomes smoggy yellowish-brown
+    // Sky gradient
     const topColor = tox > 50 ? 0x78716c : 0x0284c7;
     const bottomColor = tox > 50 ? 0xa8a29e : 0xbae6fd;
 
     this.skyGraphics.fillGradientStyle(topColor, topColor, bottomColor, bottomColor, 1);
-    this.skyGraphics.fillRect(0, 0, width, 400);
+    this.skyGraphics.fillRect(0, 0, width, groundY);
 
     // Sun / Smog orb
     const sunColor = tox > 50 ? 0xf97316 : 0xfef08a;
     this.skyGraphics.fillStyle(sunColor, 0.9);
-    this.skyGraphics.fillCircle(120, 100, 36);
+    this.skyGraphics.fillCircle(Math.min(130, width * 0.12), Math.min(100, groundY * 0.25), 36);
 
-    // Distant mountain silhouettes
+    // Distant mountain silhouettes dynamically generated across width
     this.skyGraphics.fillStyle(tox > 50 ? 0x44403c : 0x0369a1, 0.4);
     this.skyGraphics.beginPath();
-    this.skyGraphics.moveTo(0, 400);
-    this.skyGraphics.lineTo(150, 240);
-    this.skyGraphics.lineTo(340, 380);
-    this.skyGraphics.lineTo(520, 260);
-    this.skyGraphics.lineTo(750, 390);
-    this.skyGraphics.lineTo(950, 220);
-    this.skyGraphics.lineTo(width, 400);
+    this.skyGraphics.moveTo(0, groundY);
+
+    const mountainStep = Math.max(120, width / 7);
+    let isHigh = false;
+    for (let x = 0; x <= width + mountainStep; x += mountainStep) {
+      const peakY = isHigh ? groundY - 140 : groundY - 50;
+      this.skyGraphics.lineTo(Math.min(x, width), peakY);
+      isHigh = !isHigh;
+    }
+
+    this.skyGraphics.lineTo(width, groundY);
     this.skyGraphics.closePath();
     this.skyGraphics.fill();
   }
@@ -104,45 +131,84 @@ export class SurfaceScene extends Phaser.Scene {
   private drawGround() {
     this.groundGraphics.clear();
     const { width, height } = this.scale;
+    const groundY = this.getGroundY();
 
     // Grass surface strip
     this.groundGraphics.fillStyle(0x15803d, 1);
-    this.groundGraphics.fillRect(0, 390, width, 25);
+    this.groundGraphics.fillRect(0, groundY - 10, width, 25);
 
     // Subterranean soil layers (visible underground cutaway)
     this.groundGraphics.fillStyle(0x78350f, 1);
-    this.groundGraphics.fillRect(0, 415, width, 120);
+    this.groundGraphics.fillRect(0, groundY + 15, width, 120);
 
+    // Deep bedrock
     this.groundGraphics.fillStyle(0x334155, 1);
-    this.groundGraphics.fillRect(0, 535, width, height - 535);
+    this.groundGraphics.fillRect(0, groundY + 135, width, Math.max(0, height - (groundY + 135)));
 
     // Cracks if Tectonic Weight is high
     const weight = gameState.metrics.tectonicWeight;
     if (weight > 30) {
       this.groundGraphics.lineStyle(2, 0xef4444, Math.min(1, weight / 80));
-      for (let i = 80; i < width; i += 160) {
+      for (let i = 80; i < width; i += 150) {
         this.groundGraphics.beginPath();
-        this.groundGraphics.moveTo(i, 395);
-        this.groundGraphics.lineTo(i + 15, 430);
-        this.groundGraphics.lineTo(i + 5, 470);
+        this.groundGraphics.moveTo(i, groundY - 5);
+        this.groundGraphics.lineTo(i + 15, groundY + 30);
+        this.groundGraphics.lineTo(i + 5, groundY + 70);
         this.groundGraphics.stroke();
       }
     }
   }
 
   private createClouds() {
-    for (let i = 0; i < 4; i++) {
-      const x = Phaser.Math.Between(50, 950);
-      const y = Phaser.Math.Between(40, 180);
-      const cloud = this.add.ellipse(x, y, Phaser.Math.Between(70, 130), 30, 0xffffff, 0.6);
+    this.cloudsGroup.clear(true, true);
+    const { width } = this.scale;
+    const groundY = this.getGroundY();
+    const cloudCount = Math.max(3, Math.min(7, Math.floor(width / 260)));
+
+    for (let i = 0; i < cloudCount; i++) {
+      const x = Phaser.Math.Between(40, width - 40);
+      const y = Phaser.Math.Between(50, Math.max(70, groundY * 0.45));
+      const cloud = this.add.ellipse(x, y, Phaser.Math.Between(70, 130), 28, 0xffffff, 0.6);
+      this.cloudsGroup.add(cloud);
+
       this.tweens.add({
         targets: cloud,
-        x: '+=120',
+        x: `+=${Phaser.Math.Between(80, 140)}`,
         duration: Phaser.Math.Between(18000, 30000),
         yoyo: true,
         repeat: -1,
-        ease: 'Sine.easeInOut'
+        ease: 'Sine.easeInOut',
       });
+    }
+  }
+
+  /**
+   * Dynamically adjust plot count and spacing based on screen width
+   * Supports from 6 plots on compact screens up to 10-14 plots on ultra-wide screens!
+   */
+  private syncPlotsLayout() {
+    const { width } = this.scale;
+    const groundY = this.getGroundY();
+
+    const minPlots = 6;
+    const maxPlots = 14;
+    // Calculate target plot capacity based on screen width
+    const targetCount = Math.max(minPlots, Math.min(maxPlots, Math.floor((width - 240) / 115)));
+
+    // Ensure state has enough plot records
+    while (gameState.plots.length < targetCount) {
+      const newId = gameState.plots.length;
+      gameState.plots.push({ id: newId, x: 0, y: groundY - 20, building: null });
+    }
+
+    const count = gameState.plots.length;
+    const startX = Math.max(70, Math.round(width * 0.07));
+    const endX = width - 150; // Leave comfortable room for mine elevator entrance
+    const step = count > 1 ? (endX - startX) / (count - 1) : 120;
+
+    for (let i = 0; i < count; i++) {
+      gameState.plots[i].x = Math.round(startX + i * step);
+      gameState.plots[i].y = groundY - 20;
     }
   }
 
@@ -150,15 +216,23 @@ export class SurfaceScene extends Phaser.Scene {
     this.treesGroup.clear(true, true);
     const roots = gameState.metrics.rootIntegrity;
     const treeKey = roots > 40 ? 'tree_green' : 'tree_withered';
+    const groundY = this.getGroundY();
 
-    // Spawn trees between plots
-    const treePositions = [40, 185, 315, 445, 575, 705, 835];
+    // Calculate tree spawn points between building plots
+    const treePositions: number[] = [];
+    const count = gameState.plots.length;
+    if (count > 0) {
+      treePositions.push(Math.max(25, gameState.plots[0].x - 45));
+      for (let i = 0; i < count - 1; i++) {
+        treePositions.push(Math.round((gameState.plots[i].x + gameState.plots[i + 1].x) / 2));
+      }
+      treePositions.push(Math.min(this.scale.width - 210, gameState.plots[count - 1].x + 45));
+    }
+
     const treeCount = Math.ceil((roots / 100) * treePositions.length);
-
     for (let i = 0; i < treePositions.length; i++) {
-      const posX = treePositions[i];
       if (i < treeCount) {
-        const tree = this.add.image(posX, 365, treeKey);
+        const tree = this.add.image(treePositions[i], groundY - 15, treeKey);
         tree.setOrigin(0.5, 1);
         this.treesGroup.add(tree);
       }
@@ -166,6 +240,8 @@ export class SurfaceScene extends Phaser.Scene {
   }
 
   private renderPlots() {
+    this.syncPlotsLayout();
+
     this.plotSprites.forEach(c => c.destroy());
     this.plotSprites.clear();
 
@@ -245,14 +321,20 @@ export class SurfaceScene extends Phaser.Scene {
   }
 
   private createMineShaftEntrance() {
-    const shaftX = 970;
-    const shaftY = 360;
+    if (this.mineShaftContainer) this.mineShaftContainer.destroy();
 
-    const shaftGantry = this.add.rectangle(shaftX, shaftY - 20, 56, 90, 0x0f172a, 0.9)
+    const { width } = this.scale;
+    const groundY = this.getGroundY();
+    const shaftX = width - 75;
+    const shaftY = groundY - 30;
+
+    this.mineShaftContainer = this.add.container(shaftX, shaftY);
+
+    const shaftGantry = this.add.rectangle(0, -20, 56, 90, 0x0f172a, 0.9)
       .setStrokeStyle(3, 0xf59e0b);
-    const cage = this.add.image(shaftX, shaftY + 10, 'elevator').setScale(0.85);
+    const cage = this.add.image(0, 10, 'elevator').setScale(0.85);
 
-    const sign = this.add.text(shaftX, shaftY - 60, '⛏️ DEEP MINE\n[CLICK / TAB]', {
+    const sign = this.add.text(0, -60, '⛏️ DEEP MINE\n[CLICK / TAB]', {
       fontFamily: '"Press Start 2P", monospace',
       fontSize: '7px',
       color: '#f59e0b',
@@ -266,6 +348,8 @@ export class SurfaceScene extends Phaser.Scene {
     cage.setInteractive({ useHandCursor: true });
     cage.on('pointerdown', () => this.transitionToCavern());
 
+    this.mineShaftContainer.add([shaftGantry, cage, sign]);
+
     // Pulsing glow animation on elevator entrance
     this.tweens.add({
       targets: [sign, cage],
@@ -277,7 +361,8 @@ export class SurfaceScene extends Phaser.Scene {
   }
 
   private createBuildMenu() {
-    this.buildMenuContainer = this.add.container(512, 320);
+    const { width, height } = this.scale;
+    this.buildMenuContainer = this.add.container(width / 2, height / 2);
     this.buildMenuContainer.setVisible(false);
     this.buildMenuContainer.setDepth(100);
 
@@ -305,6 +390,8 @@ export class SurfaceScene extends Phaser.Scene {
 
   private openBuildMenu(plotId: number) {
     this.selectedPlotId = plotId;
+    const { width, height } = this.scale;
+    this.buildMenuContainer.setPosition(width / 2, height / 2);
     this.buildMenuContainer.setVisible(true);
 
     // Remove old cards
@@ -385,7 +472,6 @@ export class SurfaceScene extends Phaser.Scene {
         constructBtn.setInteractive({ useHandCursor: true });
         constructBtn.on('pointerdown', () => {
           if (this.selectedPlotId !== null) {
-            sounds.playBuildPlace();
             gameState.build(this.selectedPlotId, def.id);
             this.closeBuildMenu();
           }
@@ -406,6 +492,8 @@ export class SurfaceScene extends Phaser.Scene {
 
   private showBuildingInspect(plotId: number, name: string, consequence: string) {
     this.selectedPlotId = plotId;
+    const { width, height } = this.scale;
+    this.buildMenuContainer.setPosition(width / 2, height / 2);
     this.buildMenuContainer.setVisible(true);
 
     const children = this.buildMenuContainer.getAll();
@@ -442,7 +530,6 @@ export class SurfaceScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     demoBtn.on('pointerdown', () => {
-      sounds.playDemolish();
       gameState.demolish(plotId);
       this.closeBuildMenu();
     });
@@ -453,8 +540,12 @@ export class SurfaceScene extends Phaser.Scene {
 
   public transitionToCavern() {
     sounds.playElevator();
-    this.cameras.main.pan(970, 700, 600, 'Power2');
-    this.cameras.main.fade(600, 0, 0, 0, false, (_cam: unknown, progress: number) => {
+    const { width } = this.scale;
+    const groundY = this.getGroundY();
+    const shaftX = width - 75;
+
+    this.cameras.main.pan(shaftX, groundY + 100, 500, 'Power2');
+    this.cameras.main.fade(500, 0, 0, 0, false, (_cam: unknown, progress: number) => {
       if (progress === 1) {
         this.scene.sleep('SurfaceScene');
         if (this.scene.isSleeping('CavernScene')) {
@@ -466,18 +557,28 @@ export class SurfaceScene extends Phaser.Scene {
     });
   }
 
-  public refreshSurfaceVisuals() {
-    if (gameState.day > this.lastKnownDay) {
-      this.lastKnownDay = gameState.day;
-      sounds.playPassDay();
+  public handleResize(gameSize?: Phaser.Structs.Size) {
+    const width = gameSize ? gameSize.width : this.scale.width;
+    const height = gameSize ? gameSize.height : this.scale.height;
+
+    this.cameras.main.centerOn(width / 2, height / 2);
+    this.refreshSurfaceVisuals();
+
+    if (this.buildMenuContainer) {
+      this.buildMenuContainer.setPosition(width / 2, height / 2);
     }
+  }
+
+  public refreshSurfaceVisuals() {
     this.drawSky();
     this.drawGround();
-    this.updateTrees();
     this.renderPlots();
+    this.updateTrees();
+    this.createMineShaftEntrance();
   }
 
   destroy() {
+    this.scale.off('resize', this.handleResize, this);
     if (this.unsubscribe) this.unsubscribe();
   }
 }

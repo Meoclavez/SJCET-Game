@@ -414,11 +414,11 @@ export class PlaytimeEventEngine {
 
     if (event.severity === 'critical' || event.type === 'invasion' || event.type === 'siege') {
       sounds.playTremor();
-      sounds.playAlert();
+      sounds.playHazardAlarm();
     } else if (event.type === 'coronation') {
-      sounds.playCastleHorn();
+      sounds.playRoyalFanfare();
     } else {
-      sounds.playAlert();
+      sounds.playHazardAlarm();
     }
 
     gameState.addLog(`⚡ EVENT TRIGGERED: [Minute ${event.triggerMinute}] ${event.title} - ${event.subtitle}`, event.severity === 'critical' ? 'crisis' : 'warning');
@@ -434,7 +434,7 @@ export class PlaytimeEventEngine {
 
     // Check affordability with fallback for emergency choices
     if (choice.cost && !gameState.canAfford(choice.cost)) {
-      sounds.playAlert();
+      sounds.playHazardAlarm();
       alert("Insufficient resources to execute this directive! Choose an alternative plan or procure resources.");
       return;
     }
@@ -466,8 +466,9 @@ export class PlaytimeEventEngine {
 
     // Play victory / confirm sound
     if (event.type === 'coronation' || choice.rankPromotion === 'king') {
-      sounds.playCastleHorn();
-      sounds.playVictory();
+      sounds.playRoyalFanfare();
+    } else if (event.id === 'acid_leak_panic' && choiceIndex === 0) {
+      sounds.playNeutralizeSuccess();
     } else {
       sounds.playSaoConfirm();
     }

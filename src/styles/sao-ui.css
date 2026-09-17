@@ -12,14 +12,29 @@
 /* Floating Vertical SAO Hexagonal Navigation */
 .sao-nav {
   position: fixed;
-  right: 24px;
+  right: clamp(12px, 1.8vw, 24px);
   top: 50%;
-  transform: translateY(-50%);
+  transform: translateY(-50%) translateZ(0);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: clamp(8px, 1.2vh, 12px);
   z-index: 3500 !important;
   pointer-events: auto !important;
+  contain: layout style;
+  will-change: transform;
+}
+
+@media (max-height: 680px) {
+  .sao-hex-btn {
+    width: 56px !important;
+    height: 50px !important;
+  }
+  .hex-icon {
+    font-size: 16px !important;
+  }
+  .hex-label {
+    font-size: 6px !important;
+  }
 }
 
 .sao-hex-btn {
@@ -28,7 +43,7 @@
   align-items: center;
   justify-content: center;
   width: 68px;
-  height: 64px;
+  height: 60px;
   background: var(--sao-bg-glass);
   border: 2px solid var(--sao-border-cyan);
   border-radius: 12px;
@@ -84,26 +99,32 @@
   inset: 0;
   background: rgba(4, 8, 16, 0.85);
   backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 2000;
   animation: fadeIn 0.2s ease-out;
+  contain: layout style paint;
+  will-change: opacity;
 }
 
 /* SAO Glassmorphism Panel */
 .sao-glass-panel {
-  width: 880px;
+  width: 100% !important;
+  max-width: min(92vw, 1100px) !important;
   max-height: 90vh;
   background: var(--sao-bg-glass);
   border: 2px solid var(--sao-cyan);
   border-radius: 16px;
-  padding: 24px;
+  padding: clamp(14px, 2.5vw, 24px);
   box-shadow: 0 12px 48px rgba(0, 0, 0, 0.8), 0 0 35px rgba(0, 245, 255, 0.3);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   clip-path: polygon(0 0, 97% 0, 100% 4%, 100% 100%, 3% 100%, 0 96%);
+  contain: layout style;
+  will-change: transform;
 }
 
 .sao-panel-header {
@@ -174,6 +195,8 @@
   gap: 16px;
   overflow-y: auto;
   padding-right: 6px;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 300px;
 }
 
 .sao-item-card {
@@ -182,6 +205,7 @@
   border-radius: 10px;
   padding: 16px;
   display: flex;
+  contain: layout style;
   flex-direction: column;
   gap: 10px;
   transition: all 0.2s ease;
@@ -454,9 +478,9 @@
 }
 
 .sao-snapshot-panel {
-  width: 820px;
-  max-width: 94vw;
-  max-height: 94vh;
+  width: 100% !important;
+  max-width: min(92vw, 900px) !important;
+  max-height: 92vh;
   z-index: 5010 !important;
   pointer-events: auto !important;
   border-color: var(--sao-gold);
@@ -543,11 +567,14 @@
 /* ========================================= */
 
 .sao-war-panel {
-  width: 980px !important;
-  max-width: 95vw;
-  height: 88vh;
+  width: 100% !important;
+  max-width: min(94vw, 1100px) !important;
+  height: min(88vh, 850px);
+  max-height: 90vh;
   display: flex;
   flex-direction: column;
+  contain: layout style;
+  will-change: transform;
 }
 
 .sao-war-rank-header {
@@ -628,6 +655,8 @@
   flex: 1;
   overflow-y: auto;
   padding-right: 4px;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 500px;
 }
 
 /* ========================================= */
@@ -1468,19 +1497,54 @@
 
 .sao-playtime-hud {
   position: fixed;
-  top: 10px;
-  left: 14px;
+  top: clamp(38px, 4.5vh, 42px);
+  left: clamp(8px, 1.5vw, 14px);
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: clamp(6px, 1vw, 10px);
   background: var(--sao-bg-glass);
   border: 1.5px solid var(--sao-cyan);
   border-radius: 10px;
-  padding: 5px 12px;
-  z-index: 1200;
+  padding: 4px clamp(8px, 1.2vw, 12px);
+  z-index: 2500 !important;
+  pointer-events: auto !important;
   backdrop-filter: blur(16px);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7), 0 0 15px rgba(0, 245, 255, 0.25);
   clip-path: polygon(0 0, 96% 0, 100% 25%, 100% 100%, 4% 100%, 0 75%);
+}
+
+@media (max-width: 1100px) {
+  .sao-playtime-hud {
+    padding: 3px 8px;
+    gap: 5px;
+  }
+  .hud-digital-clock {
+    font-size: 9.5px;
+  }
+  .hud-total-hours {
+    font-size: 9.5px;
+  }
+  .hud-rank-section {
+    padding: 2px 5px;
+    font-size: 7px;
+  }
+  .hud-timeline-btn {
+    font-size: 7px;
+    padding: 4px 6px;
+  }
+  .hud-spd-btn {
+    font-size: 7px;
+    padding: 2px 5px;
+  }
+}
+
+@media (max-width: 768px) {
+  .hud-total-hours {
+    display: none;
+  }
+  .hud-speed-controls {
+    display: none;
+  }
 }
 
 .hud-clock-section {
@@ -1746,8 +1810,8 @@
 /* ========================================= */
 
 .sao-decision-dialog {
-  width: 960px !important;
-  max-width: 95vw;
+  width: 100% !important;
+  max-width: min(92vw, 960px) !important;
   max-height: 92vh;
   display: flex;
   flex-direction: column;
@@ -1965,8 +2029,8 @@
 /* ========================================= */
 
 .sao-timeline-dialog {
-  width: 900px !important;
-  max-width: 95vw;
+  width: 100% !important;
+  max-width: min(92vw, 900px) !important;
   max-height: 88vh;
   display: flex;
   flex-direction: column;
@@ -2104,4 +2168,32 @@
   50% { box-shadow: 0 0 22px rgba(245, 158, 11, 0.8); }
   100% { box-shadow: 0 0 10px rgba(245, 158, 11, 0.4); }
 }
+
+/* Beautiful SAO Scrollbars */
+.sao-cards-grid::-webkit-scrollbar,
+.sao-war-content-body::-webkit-scrollbar,
+.sao-timeline-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sao-cards-grid::-webkit-scrollbar-track,
+.sao-war-content-body::-webkit-scrollbar-track,
+.sao-timeline-list::-webkit-scrollbar-track {
+  background: rgba(10, 16, 28, 0.5);
+  border-radius: 3px;
+}
+
+.sao-cards-grid::-webkit-scrollbar-thumb,
+.sao-war-content-body::-webkit-scrollbar-thumb,
+.sao-timeline-list::-webkit-scrollbar-thumb {
+  background: rgba(0, 245, 255, 0.4);
+  border-radius: 3px;
+}
+
+.sao-cards-grid::-webkit-scrollbar-thumb:hover,
+.sao-war-content-body::-webkit-scrollbar-thumb:hover,
+.sao-timeline-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 245, 255, 0.8);
+}
+
 
