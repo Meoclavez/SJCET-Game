@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OVERBURDEN: Tales from the Under-Town</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/styles/sao-ui.css">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    body {
+      background: #0d1117;
+      color: #e6edf3;
+      font-family: 'Rajdhani', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    #game-container {
+      position: relative;
+      width: 1024px;
+      height: 640px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8), 0 0 20px rgba(255, 170, 0, 0.2);
+      border: 3px solid #30363d;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #161b22;
+    }
+    canvas {
+      display: block;
+      width: 100% !important;
+      height: 100% !important;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+    .header-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 1024px;
+      padding: 8px 12px;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 11px;
+      color: #8b949e;
+      background: #161b22;
+      border-radius: 8px 8px 0 0;
+      border: 3px solid #30363d;
+      border-bottom: none;
+    }
+    .game-title {
+      color: #f0883e;
+      letter-spacing: 1px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .game-theme {
+      color: #7ee787;
+      font-size: 10px;
+    }
+    .controls-hint {
+      display: flex;
+      gap: 16px;
+      font-size: 9px;
+      color: #8b949e;
+    }
+    .kbd-badge {
+      background: #21262d;
+      border: 1px solid #484f58;
+      border-radius: 4px;
+      padding: 2px 6px;
+      color: #58a6ff;
+    }
+  </style>
+</head>
+<body>
+  <div class="header-bar">
+    <div class="game-title">
+      <span>⛏️ OVERBURDEN</span>
+      <span style="font-size: 9px; color: #8b949e;">:: Tales from the Under-Town</span>
+    </div>
+    <div class="controls-hint">
+      <span><span class="kbd-badge">TAB</span> Switch View</span>
+      <span><span class="kbd-badge">A</span><span class="kbd-badge">D</span> Move</span>
+      <span><span class="kbd-badge">SPACE</span> Jump</span>
+      <span><span class="kbd-badge">J</span> / <span class="kbd-badge">CLICK</span> Mine</span>
+    </div>
+    <div class="game-theme">THEME: UNEXPECTED CONSEQUENCES</div>
+  </div>
+  <div id="game-container"></div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
