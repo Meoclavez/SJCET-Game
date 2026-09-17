@@ -92,6 +92,16 @@ export class CavernScene extends Phaser.Scene {
       this.syncConsequences();
     });
 
+    // Scene lifecycle listeners
+    this.events.on(Phaser.Scenes.Events.WAKE, () => {
+      this.cameras.main.fadeIn(400, 0, 0, 0);
+      this.resetCavernRun();
+    });
+
+    this.events.on(Phaser.Scenes.Events.SHUTDOWN, () => {
+      if (this.unsubscribe) this.unsubscribe();
+    });
+
     // Camera fade in
     this.cameras.main.fadeIn(400, 0, 0, 0);
 
@@ -118,7 +128,7 @@ export class CavernScene extends Phaser.Scene {
   private buildDynamicCavernLevel() {
     this.platforms.clear(true, true);
     this.crumblingPlatforms.forEach(p => p.destroy());
-    this.crumblingPlatforms = [];
+    this.crumblingPlatforms.length = 0;
 
     const roots = gameState.metrics.rootIntegrity;
     const isMud = roots < 40;
@@ -482,6 +492,7 @@ export class CavernScene extends Phaser.Scene {
 
   private damageMiningNode(node: MiningNode) {
     node.hp -= 1;
+    sounds.playPickaxeClink(node.type);
     this.cameras.main.shake(80, 0.005);
     this.spawnSparks(node.x, node.y);
 
@@ -654,6 +665,39 @@ export class CavernScene extends Phaser.Scene {
     // Rebuild ceiling and fluids if state mutated
     this.buildDynamicCeiling();
     this.buildDynamicFluidPool();
+  }
+
+  public resetCavernRun() {
+    // Reset player HP and run stats
+    this.playerHp = 100;
+    this.haulCount = 0;
+    this.isInvulnerable = false;
+
+    // Reposition player at elevator spawn (initial spawn coords)
+    if (this.player) {
+      this.player.setPosition(910, 80);
+      this.player.setVelocity(0, 0);
+      this.player.clearTint();
+      this.player.setAlpha(1);
+    }
+    if (this.pickaxeSprite) {
+      this.pickaxeSprite.setPosition(922, 80);
+      this.pickaxeSprite.setAngle(0);
+      this.pickaxeSprite.setFlipX(false);
+    }
+
+    // Clear and rebuild dynamic platforms, ceiling, and fluid pool according to current gameState metrics
+    this.buildDynamicCavernLevel();
+    this.buildDynamicCeiling();
+    this.buildDynamicFluidPool();
+
+    // Re-spawn mining nodes: clear old nodeSprites, call spawnMiningNodes
+    this.nodeSprites.forEach(c => c.destroy());
+    this.nodeSprites.clear();
+    this.spawnMiningNodes();
+
+    // Announce active mutations
+    this.announceActiveMutations();
   }
 
   private spawnDustParticles(x: number, y: number) {

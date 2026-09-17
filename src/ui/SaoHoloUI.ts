@@ -3,7 +3,7 @@ import { SHOP_ITEMS } from '../data/shopItems';
 import { GameMode } from '../types';
 import { sounds } from '../audio/SoundEffects';
 import { CityShowcase3D } from '../showcase/CityShowcase3D';
-import { warRoomUI } from './WarRoomUI';
+import { warRoomUI, WarRoomTab } from './WarRoomUI';
 
 export class SaoHoloUI {
   private container: HTMLElement;
@@ -18,8 +18,31 @@ export class SaoHoloUI {
     this.container.id = 'sao-holo-root';
     document.body.appendChild(this.container);
 
+    this.hookWarRoom();
     this.render();
     gameState.subscribe(() => this.updateHUD());
+  }
+
+  public isAnyModalOpen(): boolean {
+    return this.isStoreOpen || this.isShowcaseOpen || this.isSnapshotOpen || warRoomUI.isOpened;
+  }
+
+  private hookWarRoom() {
+    const origOpen = warRoomUI.open.bind(warRoomUI);
+    warRoomUI.open = (defaultTab?: WarRoomTab) => {
+      const kb = window.phaserGameInstance?.input?.keyboard;
+      if (kb) kb.enabled = false;
+      origOpen(defaultTab);
+    };
+
+    const origClose = warRoomUI.close.bind(warRoomUI);
+    warRoomUI.close = () => {
+      origClose();
+      if (!this.isAnyModalOpen()) {
+        const kb = window.phaserGameInstance?.input?.keyboard;
+        if (kb) kb.enabled = true;
+      }
+    };
   }
 
   private render() {
@@ -45,6 +68,10 @@ export class SaoHoloUI {
         <button class="sao-hex-btn glow-gold" id="sao-btn-showcase" title="3D City Brag Showcase">
           <span class="hex-icon">👑</span>
           <span class="hex-label">3D BRAG</span>
+        </button>
+        <button class="sao-hex-btn glow-cyan" id="sao-btn-demo" title="Replay Opening Prologue & Theme Demo">
+          <span class="hex-icon">🎬</span>
+          <span class="hex-label">PROLOGUE</span>
         </button>
         <button class="sao-hex-btn" id="sao-btn-rest" title="Pass Day">
           <span class="hex-icon">💤</span>
@@ -195,6 +222,22 @@ export class SaoHoloUI {
       this.openShowcase();
     });
 
+    document.getElementById('sao-btn-demo')?.addEventListener('click', () => {
+      sounds.playSaoOpen();
+      this.closeStore();
+      this.closeShowcase();
+      if (warRoomUI.isOpened) warRoomUI.close();
+      this.hideNav();
+
+      const phaserGame = (window as unknown as { phaserGameInstance?: Phaser.Game }).phaserGameInstance;
+      if (phaserGame) {
+        phaserGame.scene.stop('SurfaceScene');
+        phaserGame.scene.stop('CavernScene');
+        phaserGame.scene.stop('UIScene');
+        phaserGame.scene.start('OpeningDemoScene');
+      }
+    });
+
     document.getElementById('sao-btn-rest')?.addEventListener('click', () => {
       sounds.playSaoConfirm();
       gameState.endDayCycle();
@@ -299,6 +342,8 @@ export class SaoHoloUI {
   public openSnapshotModal(imgDataUrl: string) {
     this.isSnapshotOpen = true;
     this.currentSnapshotUrl = imgDataUrl;
+    const kb = window.phaserGameInstance?.input?.keyboard;
+    if (kb) kb.enabled = false;
     const modal = document.getElementById('sao-snapshot-modal');
     const img = document.getElementById('sao-snapshot-img') as HTMLImageElement;
     if (img) img.src = imgDataUrl;
@@ -311,6 +356,10 @@ export class SaoHoloUI {
     this.currentSnapshotUrl = '';
     const modal = document.getElementById('sao-snapshot-modal');
     if (modal) modal.style.display = 'none';
+    if (!this.isAnyModalOpen()) {
+      const kb = window.phaserGameInstance?.input?.keyboard;
+      if (kb) kb.enabled = true;
+    }
   }
 
   private downloadSnapshot() {
@@ -415,6 +464,8 @@ export class SaoHoloUI {
   public openStore() {
     if (this.isShowcaseOpen) this.closeShowcase();
     this.isStoreOpen = true;
+    const kb = window.phaserGameInstance?.input?.keyboard;
+    if (kb) kb.enabled = false;
     const modal = document.getElementById('sao-store-modal');
     if (modal) modal.style.display = 'flex';
     this.renderStoreItems();
@@ -424,11 +475,17 @@ export class SaoHoloUI {
     this.isStoreOpen = false;
     const modal = document.getElementById('sao-store-modal');
     if (modal) modal.style.display = 'none';
+    if (!this.isAnyModalOpen()) {
+      const kb = window.phaserGameInstance?.input?.keyboard;
+      if (kb) kb.enabled = true;
+    }
   }
 
   public openShowcase() {
     if (this.isStoreOpen) this.closeStore();
     this.isShowcaseOpen = true;
+    const kb = window.phaserGameInstance?.input?.keyboard;
+    if (kb) kb.enabled = false;
     const modal = document.getElementById('sao-showcase-modal');
     if (modal) modal.style.display = 'flex';
 
@@ -465,6 +522,10 @@ export class SaoHoloUI {
       this.showcase3D.resetCamera();
       this.showcase3D.pause();
     }
+    if (!this.isAnyModalOpen()) {
+      const kb = window.phaserGameInstance?.input?.keyboard;
+      if (kb) kb.enabled = true;
+    }
   }
 
   private updateBragStats() {
@@ -500,5 +561,15 @@ export class SaoHoloUI {
       this.updateBragStats();
       if (this.showcase3D) this.showcase3D.rebuildCityMeshes();
     }
+  }
+
+  public hideNav() {
+    const nav = this.container.querySelector('.sao-nav') as HTMLElement;
+    if (nav) nav.style.display = 'none';
+  }
+
+  public showNav() {
+    const nav = this.container.querySelector('.sao-nav') as HTMLElement;
+    if (nav) nav.style.display = 'flex';
   }
 }

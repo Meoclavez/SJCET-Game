@@ -12,6 +12,7 @@ export class SurfaceScene extends Phaser.Scene {
   private skyGraphics!: Phaser.GameObjects.Graphics;
   private groundGraphics!: Phaser.GameObjects.Graphics;
   private unsubscribe!: () => void;
+  private lastKnownDay: number = 1;
 
   constructor() {
     super({ key: 'SurfaceScene' });
@@ -19,6 +20,7 @@ export class SurfaceScene extends Phaser.Scene {
 
   create() {
     gameState.currentMode = GameMode.SURFACE;
+    this.lastKnownDay = gameState.day;
 
     // 1. Draw Sky & Mountain Background
     this.skyGraphics = this.add.graphics();
@@ -47,6 +49,18 @@ export class SurfaceScene extends Phaser.Scene {
     // 8. Subscribe to GameState changes
     this.unsubscribe = gameState.subscribe(() => {
       this.refreshSurfaceVisuals();
+    });
+
+    // Scene lifecycle listeners
+    this.events.on(Phaser.Scenes.Events.WAKE, () => {
+      const { width, height } = this.scale;
+      this.cameras.main.centerOn(width / 2, height / 2);
+      this.cameras.main.fadeIn(400, 0, 0, 0);
+      this.refreshSurfaceVisuals();
+    });
+
+    this.events.on(Phaser.Scenes.Events.SHUTDOWN, () => {
+      if (this.unsubscribe) this.unsubscribe();
     });
 
     // Handle TAB key to toggle modes
@@ -371,6 +385,7 @@ export class SurfaceScene extends Phaser.Scene {
         constructBtn.setInteractive({ useHandCursor: true });
         constructBtn.on('pointerdown', () => {
           if (this.selectedPlotId !== null) {
+            sounds.playBuildPlace();
             gameState.build(this.selectedPlotId, def.id);
             this.closeBuildMenu();
           }
@@ -427,6 +442,7 @@ export class SurfaceScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     demoBtn.on('pointerdown', () => {
+      sounds.playDemolish();
       gameState.demolish(plotId);
       this.closeBuildMenu();
     });
@@ -451,6 +467,10 @@ export class SurfaceScene extends Phaser.Scene {
   }
 
   public refreshSurfaceVisuals() {
+    if (gameState.day > this.lastKnownDay) {
+      this.lastKnownDay = gameState.day;
+      sounds.playPassDay();
+    }
     this.drawSky();
     this.drawGround();
     this.updateTrees();

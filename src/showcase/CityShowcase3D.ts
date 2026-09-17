@@ -41,6 +41,11 @@ export class CityShowcase3D {
   private previousMouseX: number = 0;
   private previousMouseY: number = 0;
 
+  private onWindowMouseUp: (() => void) | null = null;
+  private onDomMouseDown: ((e: MouseEvent) => void) | null = null;
+  private onDomMouseMove: ((e: MouseEvent) => void) | null = null;
+  private onDomWheel: ((e: WheelEvent) => void) | null = null;
+
   private animatedElements: AnimatedElement[] = [];
 
   // Reusable Materials
@@ -360,7 +365,19 @@ export class CityShowcase3D {
   public rebuildCityMeshes() {
     // Clean old meshes and animations
     while (this.buildingMeshes.children.length > 0) {
-      this.buildingMeshes.remove(this.buildingMeshes.children[0]);
+      const child = this.buildingMeshes.children[0];
+      child.traverse((node) => {
+        if ((node as THREE.Mesh).isMesh) {
+          const mesh = node as THREE.Mesh;
+          mesh.geometry?.dispose();
+          if (Array.isArray(mesh.material)) {
+            mesh.material.forEach(m => m.dispose());
+          } else if (mesh.material) {
+            mesh.material.dispose();
+          }
+        }
+      });
+      this.buildingMeshes.remove(child);
     }
     this.animatedElements = [];
 
@@ -1743,18 +1760,18 @@ export class CityShowcase3D {
   private setupControls() {
     const dom = this.renderer.domElement;
 
-    dom.addEventListener('mousedown', (e) => {
+    this.onDomMouseDown = (e: MouseEvent) => {
       this.isDragging = true;
       this.isAutoRotating = false;
       this.previousMouseX = e.clientX;
       this.previousMouseY = e.clientY;
-    });
+    };
 
-    window.addEventListener('mouseup', () => {
+    this.onWindowMouseUp = () => {
       this.isDragging = false;
-    });
+    };
 
-    dom.addEventListener('mousemove', (e) => {
+    this.onDomMouseMove = (e: MouseEvent) => {
       if (!this.isDragging) return;
       const deltaX = e.clientX - this.previousMouseX;
       const deltaY = e.clientY - this.previousMouseY;
@@ -1765,13 +1782,18 @@ export class CityShowcase3D {
       this.previousMouseX = e.clientX;
       this.previousMouseY = e.clientY;
       this.updateCameraPosition();
-    });
+    };
 
-    dom.addEventListener('wheel', (e) => {
+    this.onDomWheel = (e: WheelEvent) => {
       e.preventDefault();
       this.cameraRadius = Math.max(7, Math.min(32, this.cameraRadius + e.deltaY * 0.02));
       this.updateCameraPosition();
-    });
+    };
+
+    dom.addEventListener('mousedown', this.onDomMouseDown);
+    window.addEventListener('mouseup', this.onWindowMouseUp);
+    dom.addEventListener('mousemove', this.onDomMouseMove);
+    dom.addEventListener('wheel', this.onDomWheel);
   }
 
   private updateCameraPosition() {
@@ -1875,7 +1897,56 @@ export class CityShowcase3D {
     this.isRunning = false;
     if (this.animationFrameId !== null) {
       cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
     }
+
+    if (this.onWindowMouseUp) {
+      window.removeEventListener('mouseup', this.onWindowMouseUp);
+      this.onWindowMouseUp = null;
+    }
+
+    if (this.renderer) {
+      const dom = this.renderer.domElement;
+      if (this.onDomMouseDown) {
+        dom.removeEventListener('mousedown', this.onDomMouseDown);
+        this.onDomMouseDown = null;
+      }
+      if (this.onDomMouseMove) {
+        dom.removeEventListener('mousemove', this.onDomMouseMove);
+        this.onDomMouseMove = null;
+      }
+      if (this.onDomWheel) {
+        dom.removeEventListener('wheel', this.onDomWheel);
+        this.onDomWheel = null;
+      }
+    }
+
+    if (this.scene) {
+      this.scene.traverse((node) => {
+        if ((node as THREE.Mesh).isMesh) {
+          const mesh = node as THREE.Mesh;
+          mesh.geometry?.dispose();
+          if (Array.isArray(mesh.material)) {
+            mesh.material.forEach((m) => m.dispose());
+          } else if (mesh.material) {
+            mesh.material.dispose();
+          }
+        } else {
+          const item = node as any;
+          if (item.geometry) {
+            item.geometry.dispose();
+          }
+          if (item.material) {
+            if (Array.isArray(item.material)) {
+              item.material.forEach((m: THREE.Material) => m.dispose());
+            } else {
+              item.material.dispose();
+            }
+          }
+        }
+      });
+    }
+
     if (this.renderer) {
       this.renderer.dispose();
       this.renderer.domElement.remove();

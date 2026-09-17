@@ -93,6 +93,10 @@ export class UIScene extends Phaser.Scene {
       this.refreshHUD();
     });
 
+    this.events.on(Phaser.Scenes.Events.SHUTDOWN, () => {
+      if (this.unsubscribe) this.unsubscribe();
+    });
+
     this.refreshHUD();
   }
 

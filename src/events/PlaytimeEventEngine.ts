@@ -2,6 +2,12 @@ import { gameState } from '../state/GameState';
 import { PlaytimeEventDef, MilitaryRank, TownResources } from '../types';
 import { sounds } from '../audio/SoundEffects';
 
+declare global {
+  interface Window {
+    resetGameSession?: () => void;
+  }
+}
+
 export class PlaytimeEventEngine {
   private static instance: PlaytimeEventEngine;
 
@@ -285,16 +291,27 @@ export class PlaytimeEventEngine {
 
   private constructor() {
     this.loadPersistence();
+    if (typeof window !== 'undefined') {
+      window.resetGameSession = () => this.resetGameSession();
+      window.addEventListener('game:restart', () => this.resetGameSession());
+      window.addEventListener('restartgame', () => this.resetGameSession());
+    }
   }
 
   public static getInstance(): PlaytimeEventEngine {
     if (!PlaytimeEventEngine.instance) {
       PlaytimeEventEngine.instance = new PlaytimeEventEngine();
     }
+    if (typeof window !== 'undefined') {
+      window.resetGameSession = () => PlaytimeEventEngine.instance.resetGameSession();
+    }
     return PlaytimeEventEngine.instance;
   }
 
   public start() {
+    if (typeof window !== 'undefined') {
+      window.resetGameSession = () => this.resetGameSession();
+    }
     if (this.timerInterval !== null) return;
 
     this.mountDOM();
@@ -310,6 +327,18 @@ export class PlaytimeEventEngine {
       clearInterval(this.timerInterval);
       this.timerInterval = null;
     }
+  }
+
+  public resetGameSession() {
+    this.sessionSeconds = 0;
+    this.triggeredEvents.clear();
+    this.resolvedEvents.clear();
+    try {
+      localStorage.removeItem(this.STORAGE_KEY_RESOLVED);
+    } catch {
+      // Ignore localStorage errors
+    }
+    this.updateHUD();
   }
 
   private tick() {
