@@ -1249,6 +1249,180 @@ export class SoundController {
   public playConquestFanfare(): void {
     this.playRoyalFanfare();
   }
+
+  /**
+   * Ferocious resonant dragon roar.
+   */
+  public playDragonRoar(): void {
+    const audio = this.getOut();
+    if (!audio) return;
+    const { ctx, out } = audio;
+    const t = ctx.currentTime;
+
+    const carrier = ctx.createOscillator();
+    const mod = ctx.createOscillator();
+    const modGain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+    const gain = ctx.createGain();
+
+    carrier.type = 'sawtooth';
+    carrier.frequency.setValueAtTime(95, t);
+    carrier.frequency.linearRampToValueAtTime(145, t + 0.35);
+    carrier.frequency.exponentialRampToValueAtTime(45, t + 1.2);
+
+    mod.type = 'square';
+    mod.frequency.setValueAtTime(38, t);
+    mod.frequency.linearRampToValueAtTime(65, t + 0.4);
+
+    modGain.gain.setValueAtTime(180, t);
+    modGain.gain.exponentialRampToValueAtTime(30, t + 1.2);
+
+    mod.connect(carrier.frequency);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(700, t);
+    filter.frequency.linearRampToValueAtTime(1800, t + 0.4);
+    filter.frequency.exponentialRampToValueAtTime(250, t + 1.2);
+    filter.Q.setValueAtTime(5, t);
+
+    gain.gain.setValueAtTime(0.01, t);
+    gain.gain.linearRampToValueAtTime(0.35, t + 0.15);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
+
+    carrier.connect(filter);
+    filter.connect(gain);
+    gain.connect(out);
+
+    mod.start(t);
+    carrier.start(t);
+    mod.stop(t + 1.2);
+    carrier.stop(t + 1.2);
+  }
+
+  /**
+   * Sharp clattering bone rattle for skeleton knights.
+   */
+  public playSkeletonRattle(): void {
+    const audio = this.getOut();
+    if (!audio) return;
+    const { ctx, out } = audio;
+    const t = ctx.currentTime;
+
+    for (let i = 0; i < 3; i++) {
+      const clickTime = t + i * 0.045;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(580 + i * 140, clickTime);
+      osc.frequency.exponentialRampToValueAtTime(120, clickTime + 0.03);
+
+      gain.gain.setValueAtTime(0.18, clickTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, clickTime + 0.03);
+
+      osc.connect(gain);
+      gain.connect(out);
+
+      osc.start(clickTime);
+      osc.stop(clickTime + 0.03);
+    }
+  }
+
+  /**
+   * Resonant predatory hiss for subterranean cave stalkers.
+   */
+  public playPredatorHiss(): void {
+    const audio = this.getOut();
+    if (!audio) return;
+    const { ctx, out } = audio;
+    const t = ctx.currentTime;
+
+    // Filtered noise synth
+    const bufferSize = ctx.sampleRate * 0.35;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(2400, t);
+    filter.frequency.linearRampToValueAtTime(1400, t + 0.25);
+    filter.Q.setValueAtTime(3.5, t);
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.02, t);
+    gain.gain.linearRampToValueAtTime(0.2, t + 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(out);
+
+    noise.start(t);
+  }
+
+  /**
+   * Fiery whoosh for dragon fireball projectiles.
+   */
+  public playFireballLaunch(): void {
+    const audio = this.getOut();
+    if (!audio) return;
+    const { ctx, out } = audio;
+    const t = ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    const filter = ctx.createBiquadFilter();
+    const gain = ctx.createGain();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(320, t);
+    osc.frequency.exponentialRampToValueAtTime(80, t + 0.45);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(1400, t);
+    filter.frequency.exponentialRampToValueAtTime(200, t + 0.45);
+
+    gain.gain.setValueAtTime(0.28, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(out);
+
+    osc.start(t);
+    osc.stop(t + 0.45);
+  }
+
+  /**
+   * Deep cavern descent reverberation.
+   */
+  public playLevelDescend(): void {
+    const audio = this.getOut();
+    if (!audio) return;
+    const { ctx, out } = audio;
+    const t = ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(180, t);
+    osc.frequency.exponentialRampToValueAtTime(45, t + 0.8);
+
+    gain.gain.setValueAtTime(0.35, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
+
+    osc.connect(gain);
+    gain.connect(out);
+
+    osc.start(t);
+    osc.stop(t + 0.8);
+  }
 }
 
 export const sounds = new SoundController();

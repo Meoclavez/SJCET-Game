@@ -300,6 +300,9 @@ export class SaoHoloUI {
     document.querySelector('.sao-brag-card')?.addEventListener('mousedown', (e) => {
       e.stopPropagation();
     });
+    document.querySelector('.sao-brag-card')?.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+    });
 
     // Capture Brag Card Snapshot
     document.getElementById('brag-capture-btn')?.addEventListener('click', () => {
@@ -510,7 +513,11 @@ export class SaoHoloUI {
   public openShowcase() {
     if (this.isStoreOpen) this.closeStore();
     this.isShowcaseOpen = true;
-    const kb = window.phaserGameInstance?.input?.keyboard;
+    const phaserGame = (window as unknown as { phaserGameInstance?: Phaser.Game }).phaserGameInstance;
+    if (phaserGame && !phaserGame.isPaused) {
+      phaserGame.pause();
+    }
+    const kb = phaserGame?.input?.keyboard;
     if (kb) kb.enabled = false;
     const modal = document.getElementById('sao-showcase-modal');
     if (modal) modal.style.display = 'flex';
@@ -550,8 +557,12 @@ export class SaoHoloUI {
       this.showcase3D.resetCamera();
       this.showcase3D.pause();
     }
+    const phaserGame = (window as unknown as { phaserGameInstance?: Phaser.Game }).phaserGameInstance;
+    if (phaserGame && phaserGame.isPaused) {
+      phaserGame.resume();
+    }
     if (!this.isAnyModalOpen()) {
-      const kb = window.phaserGameInstance?.input?.keyboard;
+      const kb = phaserGame?.input?.keyboard;
       if (kb) kb.enabled = true;
     }
   }

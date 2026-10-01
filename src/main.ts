@@ -8,12 +8,15 @@ import { SaoHoloUI } from './ui/SaoHoloUI';
 import { playtimeEngine } from './events/PlaytimeEventEngine';
 
 const config: Phaser.Types.Core.GameConfig = {
-  type: Phaser.CANVAS,
+  type: Phaser.AUTO,
   parent: 'game-container',
   backgroundColor: '#0d1117',
   render: {
     pixelArt: true,
     roundPixels: true,
+    powerPreference: 'high-performance',
+    antialias: false,
+    antialiasGL: false,
   },
   scale: {
     mode: Phaser.Scale.RESIZE,

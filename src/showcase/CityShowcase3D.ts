@@ -32,18 +32,30 @@ export class CityShowcase3D {
   private cyanMotesMesh!: THREE.Points;
   private streetLanternLights: THREE.PointLight[] = [];
 
-  private isAutoRotating: boolean = true;
-  private cameraAngle: number = 0.5;
-  private cameraRadius: number = 18;
-  private cameraHeight: number = 10;
+  public isAutoRotating: boolean = true;
+  private readonly autoRotateSpeed: number = 0.22; // rad/sec (~12.6 deg/sec steady glide)
 
+  // Spherical Coordinates & Critically-Damped Smoothing
+  private targetAzimuth: number = 0.5;
+  private currentAzimuth: number = 0.5;
+  private targetPolar: number = 1.05; // ~60 degrees elevation for optimal architectural view
+  private currentPolar: number = 1.05;
+  private targetRadius: number = 18;
+  private currentRadius: number = 18;
+  private targetLookAtY: number = 1.4;
+  private currentLookAtY: number = 1.4;
+
+  // Inertial drag physics & velocity tracking
   private isDragging: boolean = false;
-  private previousMouseX: number = 0;
-  private previousMouseY: number = 0;
+  private previousPointerX: number = 0;
+  private previousPointerY: number = 0;
+  private velocityAzimuth: number = 0;
+  private velocityPolar: number = 0;
 
-  private onWindowMouseUp: (() => void) | null = null;
-  private onDomMouseDown: ((e: MouseEvent) => void) | null = null;
-  private onDomMouseMove: ((e: MouseEvent) => void) | null = null;
+  // Cleanup listeners
+  private onPointerDown: ((e: PointerEvent) => void) | null = null;
+  private onPointerMove: ((e: PointerEvent) => void) | null = null;
+  private onPointerUp: ((e: PointerEvent) => void) | null = null;
   private onDomWheel: ((e: WheelEvent) => void) | null = null;
 
   private animatedElements: AnimatedElement[] = [];
@@ -81,7 +93,7 @@ export class CityShowcase3D {
       powerPreference: 'high-performance'
     });
     this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.25));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -191,8 +203,8 @@ export class CityShowcase3D {
     const dirSun = new THREE.DirectionalLight(0xfff7ed, 1.8);
     dirSun.position.set(15, 24, 14);
     dirSun.castShadow = true;
-    dirSun.shadow.mapSize.width = 2048;
-    dirSun.shadow.mapSize.height = 2048;
+    dirSun.shadow.mapSize.width = 1024;
+    dirSun.shadow.mapSize.height = 1024;
     dirSun.shadow.camera.near = 0.5;
     dirSun.shadow.camera.far = 60;
     dirSun.shadow.camera.left = -16;
@@ -282,6 +294,17 @@ export class CityShowcase3D {
       islandGroup.add(lantern);
     }
 
+    // Two optimized pooled ambient point lights illuminating the entire plaza
+    const plazaLight1 = new THREE.PointLight(0xf59e0b, 1.8, 14);
+    plazaLight1.position.set(3.2, 2.2, 3.2);
+    islandGroup.add(plazaLight1);
+
+    const plazaLight2 = new THREE.PointLight(0xf59e0b, 1.8, 14);
+    plazaLight2.position.set(-3.2, 2.2, -3.2);
+    islandGroup.add(plazaLight2);
+
+    this.streetLanternLights = [plazaLight1, plazaLight2];
+
     // 4. Subterranean rock strata with glowing crystal veins underneath
     const strataGeo = new THREE.CylinderGeometry(11.8, 7.5, 4.2, 40);
     const strataMat = new THREE.MeshStandardMaterial({
@@ -341,24 +364,19 @@ export class CityShowcase3D {
     const roof = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.15, 6), this.goldMat);
     roof.position.y = 1.88;
 
-    // Warm glowing amber glass core
+    // Warm glowing amber glass core (emissive glow gives visual brightness without forward point-light fragment overhead)
     const glass = new THREE.Mesh(
       new THREE.CylinderGeometry(0.09, 0.07, 0.22, 6),
       new THREE.MeshStandardMaterial({
         color: 0xf59e0b,
         emissive: 0xf59e0b,
-        emissiveIntensity: 1.2,
+        emissiveIntensity: 1.5,
         roughness: 0.2
       })
     );
     glass.position.y = 1.7;
 
-    // Soft warm street point light
-    const light = new THREE.PointLight(0xf59e0b, 1.2, 6.5);
-    light.position.y = 1.7;
-    group.add(base, shaft, cage, roof, glass, light);
-
-    this.streetLanternLights.push(light);
+    group.add(base, shaft, cage, roof, glass);
     return group;
   }
 
@@ -1759,54 +1777,81 @@ export class CityShowcase3D {
 
   private setupControls() {
     const dom = this.renderer.domElement;
+    dom.style.touchAction = 'none';
 
-    this.onDomMouseDown = (e: MouseEvent) => {
+    this.onPointerDown = (e: PointerEvent) => {
+      if (e.button !== 0 && e.pointerType === 'mouse') return;
       this.isDragging = true;
-      this.isAutoRotating = false;
-      this.previousMouseX = e.clientX;
-      this.previousMouseY = e.clientY;
+      this.previousPointerX = e.clientX;
+      this.previousPointerY = e.clientY;
+      this.velocityAzimuth = 0;
+      this.velocityPolar = 0;
+      try {
+        dom.setPointerCapture(e.pointerId);
+      } catch {
+        // Fallback
+      }
     };
 
-    this.onWindowMouseUp = () => {
-      this.isDragging = false;
-    };
-
-    this.onDomMouseMove = (e: MouseEvent) => {
+    this.onPointerMove = (e: PointerEvent) => {
       if (!this.isDragging) return;
-      const deltaX = e.clientX - this.previousMouseX;
-      const deltaY = e.clientY - this.previousMouseY;
 
-      this.cameraAngle -= deltaX * 0.008;
-      this.cameraHeight = Math.max(3, Math.min(22, this.cameraHeight + deltaY * 0.04));
+      const deltaX = e.clientX - this.previousPointerX;
+      const deltaY = e.clientY - this.previousPointerY;
+      this.previousPointerX = e.clientX;
+      this.previousPointerY = e.clientY;
 
-      this.previousMouseX = e.clientX;
-      this.previousMouseY = e.clientY;
-      this.updateCameraPosition();
+      const rotSpeedX = 0.0055;
+      const rotSpeedY = 0.0045;
+
+      this.targetAzimuth -= deltaX * rotSpeedX;
+      this.targetPolar = Math.max(0.2, Math.min(1.45, this.targetPolar - deltaY * rotSpeedY));
+
+      // Calculate instantaneous velocity for smooth inertial release
+      this.velocityAzimuth = -deltaX * rotSpeedX * 35;
+      this.velocityPolar = -deltaY * rotSpeedY * 35;
+    };
+
+    this.onPointerUp = (e: PointerEvent) => {
+      if (!this.isDragging) return;
+      this.isDragging = false;
+      try {
+        if (dom.hasPointerCapture(e.pointerId)) {
+          dom.releasePointerCapture(e.pointerId);
+        }
+      } catch {
+        // Fallback
+      }
     };
 
     this.onDomWheel = (e: WheelEvent) => {
       e.preventDefault();
-      this.cameraRadius = Math.max(7, Math.min(32, this.cameraRadius + e.deltaY * 0.02));
-      this.updateCameraPosition();
+      const zoomFactor = e.deltaY > 0 ? 1.08 : 0.92;
+      this.targetRadius = Math.max(7, Math.min(32, this.targetRadius * zoomFactor));
     };
 
-    dom.addEventListener('mousedown', this.onDomMouseDown);
-    window.addEventListener('mouseup', this.onWindowMouseUp);
-    dom.addEventListener('mousemove', this.onDomMouseMove);
-    dom.addEventListener('wheel', this.onDomWheel);
+    dom.addEventListener('pointerdown', this.onPointerDown);
+    dom.addEventListener('pointermove', this.onPointerMove);
+    dom.addEventListener('pointerup', this.onPointerUp);
+    dom.addEventListener('pointercancel', this.onPointerUp);
+    dom.addEventListener('wheel', this.onDomWheel, { passive: false });
   }
 
   private updateCameraPosition() {
-    this.camera.position.x = Math.cos(this.cameraAngle) * this.cameraRadius;
-    this.camera.position.z = Math.sin(this.cameraAngle) * this.cameraRadius;
-    this.camera.position.y = this.cameraHeight;
-    this.camera.lookAt(0, 1.4, 0);
+    const sinP = Math.sin(this.currentPolar);
+    const cosP = Math.cos(this.currentPolar);
+    this.camera.position.x = this.currentRadius * sinP * Math.cos(this.currentAzimuth);
+    this.camera.position.z = this.currentRadius * sinP * Math.sin(this.currentAzimuth);
+    this.camera.position.y = this.currentRadius * cosP + this.currentLookAtY * 0.35;
+    this.camera.lookAt(0, this.currentLookAtY, 0);
   }
 
   public onAutoRotateChange: ((rotating: boolean) => void) | null = null;
 
   public toggleAutoRotate() {
     this.isAutoRotating = !this.isAutoRotating;
+    this.velocityAzimuth = 0;
+    this.velocityPolar = 0;
     sounds.playSaoSelect();
     if (this.onAutoRotateChange) {
       this.onAutoRotateChange(this.isAutoRotating);
@@ -1814,9 +1859,16 @@ export class CityShowcase3D {
   }
 
   public resetCamera() {
-    this.cameraAngle = 0.5;
-    this.cameraRadius = 18;
-    this.cameraHeight = 10;
+    this.targetAzimuth = 0.5;
+    this.targetPolar = 1.05;
+    this.targetRadius = 18;
+    this.targetLookAtY = 1.4;
+    this.velocityAzimuth = 0;
+    this.velocityPolar = 0;
+    this.currentAzimuth = this.targetAzimuth;
+    this.currentPolar = this.targetPolar;
+    this.currentRadius = this.targetRadius;
+    this.currentLookAtY = this.targetLookAtY;
     this.updateCameraPosition();
   }
 
@@ -1852,11 +1904,34 @@ export class CityShowcase3D {
     const delta = Math.min(this.clock.getDelta(), 0.1);
     const time = this.clock.getElapsedTime();
 
-    // Auto-orbit camera
-    if (this.isAutoRotating) {
-      this.cameraAngle += 0.004;
-      this.updateCameraPosition();
+    // 1. Smooth rotational dynamics with inertia & delta-time independence
+    if (this.isDragging) {
+      // User actively dragging
+    } else {
+      if (Math.abs(this.velocityAzimuth) > 0.0001) {
+        this.targetAzimuth += this.velocityAzimuth * delta;
+        this.velocityAzimuth *= Math.pow(0.88, delta * 60);
+      }
+      if (Math.abs(this.velocityPolar) > 0.0001) {
+        this.targetPolar = Math.max(0.2, Math.min(1.45, this.targetPolar + this.velocityPolar * delta));
+        this.velocityPolar *= Math.pow(0.88, delta * 60);
+      }
+
+      // Continuous steady auto-orbiting when enabled
+      if (this.isAutoRotating) {
+        this.targetAzimuth += this.autoRotateSpeed * delta;
+      }
     }
+
+    // 2. Critically-damped exponential smoothing (independent of monitor refresh rate)
+    const damping = 1 - Math.exp(-14 * delta);
+    this.currentAzimuth += (this.targetAzimuth - this.currentAzimuth) * damping;
+    this.currentPolar += (this.targetPolar - this.currentPolar) * damping;
+    this.currentRadius += (this.targetRadius - this.currentRadius) * damping;
+    this.currentLookAtY += (this.targetLookAtY - this.currentLookAtY) * damping;
+
+    // 3. Compute spherical camera position
+    this.updateCameraPosition();
 
     // Update all registered architectural animations (flags, astrolabes, smoke, coals, wheels, fountains)
     for (let i = 0; i < this.animatedElements.length; i++) {
@@ -1900,20 +1975,20 @@ export class CityShowcase3D {
       this.animationFrameId = null;
     }
 
-    if (this.onWindowMouseUp) {
-      window.removeEventListener('mouseup', this.onWindowMouseUp);
-      this.onWindowMouseUp = null;
-    }
-
     if (this.renderer) {
       const dom = this.renderer.domElement;
-      if (this.onDomMouseDown) {
-        dom.removeEventListener('mousedown', this.onDomMouseDown);
-        this.onDomMouseDown = null;
+      if (this.onPointerDown) {
+        dom.removeEventListener('pointerdown', this.onPointerDown);
+        this.onPointerDown = null;
       }
-      if (this.onDomMouseMove) {
-        dom.removeEventListener('mousemove', this.onDomMouseMove);
-        this.onDomMouseMove = null;
+      if (this.onPointerMove) {
+        dom.removeEventListener('pointermove', this.onPointerMove);
+        this.onPointerMove = null;
+      }
+      if (this.onPointerUp) {
+        dom.removeEventListener('pointerup', this.onPointerUp);
+        dom.removeEventListener('pointercancel', this.onPointerUp);
+        this.onPointerUp = null;
       }
       if (this.onDomWheel) {
         dom.removeEventListener('wheel', this.onDomWheel);

@@ -55,6 +55,9 @@ export class GameStateManager {
     { id: 6, x: 900, y: 370, building: null }
   ];
 
+  public isDragonDefeated: boolean = false;
+  public minedNodeKeys: Record<number, string[]> = { 1: [], 2: [], 3: [] };
+
   public inventory: Record<string, number> = {
     soap_neutralizer: 1,
     ceiling_jack: 0,
